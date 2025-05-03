@@ -6,7 +6,6 @@ import '../../../data/models/history_item.dart';
 import '../../../themes/app_colors.dart';
 
 class HistoryView extends GetView<HistoryController> {
-  
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -18,7 +17,8 @@ class HistoryView extends GetView<HistoryController> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Riwayat Asupan Gula', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Riwayat Asupan Gula',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -30,7 +30,8 @@ class HistoryView extends GetView<HistoryController> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_today_outlined, color: Colors.black87),
+            icon: const Icon(Icons.calendar_today_outlined,
+                color: Colors.black87),
             onPressed: () async {
               DateTime? pickedDate = await showDatePicker(
                 context: context,
@@ -55,38 +56,40 @@ class HistoryView extends GetView<HistoryController> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Obx(() => TableCalendar(
-              firstDay: DateTime.utc(2022, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              focusedDay: controller.selectedDate.value,
-              selectedDayPredicate: (day) => isSameDay(controller.selectedDate.value, day),
-              onDaySelected: (selectedDay, focusedDay) {
-                controller.changeSelectedDate(selectedDay);
-              },
-              calendarFormat: controller.calendarFormat.value,
-              onFormatChanged: (format) {
-                controller.changeCalendarFormat(format);
-              },
-              headerVisible: false,
-              calendarStyle: CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                ),
-                selectedDecoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                selectedTextStyle: const TextStyle(color: Colors.white),
-                todayTextStyle: const TextStyle(color: Colors.black),
-              ),
-            )),
+                  firstDay: DateTime.utc(2022, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: controller.selectedDate.value,
+                  selectedDayPredicate: (day) =>
+                      isSameDay(controller.selectedDate.value, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    controller.changeSelectedDate(selectedDay);
+                  },
+                  calendarFormat: controller.calendarFormat.value,
+                  onFormatChanged: (format) {
+                    controller.changeCalendarFormat(format);
+                  },
+                  headerVisible: false,
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    selectedDecoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    selectedTextStyle: const TextStyle(color: Colors.white),
+                    todayTextStyle: const TextStyle(color: Colors.black),
+                  ),
+                )),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Obx(() => Text(
-              "Riwayat ${controller.formatTanggal(controller.selectedDate.value)}",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            )),
+                  "Riwayat ${controller.formatTanggal(controller.selectedDate.value)}",
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
+                )),
           ),
           Expanded(
             child: Obx(() {
@@ -96,8 +99,10 @@ class HistoryView extends GetView<HistoryController> {
                 children: [
                   // Card Total Konsumsi
                   Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     elevation: 2,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -133,35 +138,51 @@ class HistoryView extends GetView<HistoryController> {
                             itemBuilder: (context, index) {
                               final item = items[index];
                               return Card(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
                                 margin: const EdgeInsets.symmetric(vertical: 8),
                                 elevation: 2,
                                 child: ListTile(
                                   title: Text(
-                                    item.namaMakanan.isNotEmpty ? item.namaMakanan : "Makanan tidak diketahui",
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    item.namaMakanan.isNotEmpty
+                                        ? item.namaMakanan
+                                        : "Makanan tidak diketahui",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       if (item.isiPerBungkus != null)
-                                        Text("Isi Perungkus: ${item.isiPerBungkus} gram"),
-                                      Text("Jumlah Makan: ${item.jumlahBungkus} bungkus"),
-                                      Text("Kandungan Gula: ${item.gulaPerBungkus} gram/bungkus"),
-                                      Text("Total Gula: ${item.totalGula} gram (≈ ${item.konversiSendokTeh.toStringAsFixed(1)} sdt)"),
-                                      Text("Waktu Input: ${item.formattedTime}"),
+                                        Text(
+                                            "Isi Perungkus: ${item.isiPerBungkus} gram"),
+                                      Text(
+                                          "Jumlah Makan: ${item.jumlahBungkus} bungkus"),
+                                      Text(
+                                          "Kandungan Gula: ${item.gulaPerBungkus} gram/bungkus"),
+                                      Text(
+                                          "Total Gula: ${item.totalGula} gram (≈ ${item.konversiSendokTeh.toStringAsFixed(1)} sdt)"),
+                                      Text(
+                                          "Waktu Input: ${item.formattedTime}"),
                                     ],
                                   ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.edit, color: AppColors.primary),
-                                        onPressed: () => _showAddEditDialog(context, index: index, item: item),
+                                        icon: const Icon(Icons.edit,
+                                            color: AppColors.primary),
+                                        onPressed: () => _showAddEditDialog(
+                                            context,
+                                            index: index,
+                                            item: item),
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () => controller.deleteHistoryItem(index),
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () =>
+                                            controller.deleteHistoryItem(index),
                                       ),
                                     ],
                                   ),
@@ -180,74 +201,141 @@ class HistoryView extends GetView<HistoryController> {
   }
 
 // _showAddEditDialog diubah biar lengkap:
-void _showAddEditDialog(BuildContext context, {int? index, HistoryItem? item, int? gulaDariOCR}) {
-  final TextEditingController namaController = TextEditingController(text: item?.namaMakanan ?? '');
-  final TextEditingController gulaController = TextEditingController(
-    text: gulaDariOCR?.toString() ?? item?.gulaPerBungkus.toString() ?? '',
-  );
-  final TextEditingController jumlahController = TextEditingController(text: item?.jumlahBungkus.toString() ?? '');
-  final TextEditingController isiController = TextEditingController(text: item?.isiPerBungkus?.toString() ?? '');
+  void _showAddEditDialog(BuildContext context,
+      {int? index, HistoryItem? item, int? gulaDariOCR}) {
+    final TextEditingController namaController =
+        TextEditingController(text: item?.namaMakanan ?? '');
+    final TextEditingController gulaController = TextEditingController(
+      text: gulaDariOCR?.toString() ?? item?.gulaPerBungkus.toString() ?? '',
+    );
+    final TextEditingController jumlahController =
+        TextEditingController(text: item?.jumlahBungkus.toString() ?? '');
+    final TextEditingController isiController =
+        TextEditingController(text: item?.isiPerBungkus?.toString() ?? '');
+    final TextEditingController konversiController = TextEditingController();
 
-  Get.defaultDialog(
-    title: index == null ? "Tambah Makanan" : "Edit Makanan",
-    content: Column(
-      children: [
-        TextField(
-          controller: namaController,
-          decoration: const InputDecoration(labelText: "Nama Makanan (opsional)"),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: gulaController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "Kandungan Gula per Bungkus (gram)*"),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: jumlahController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "Jumlah Bungkus*"),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: isiController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "Isi Makanan per Bungkus (opsional)"),
-        ),
-      ],
-    ),
-    textConfirm: "Simpan",
-    textCancel: "Batal",
-    confirmTextColor: Colors.white,
-    onConfirm: () {
-      int gula = int.tryParse(gulaController.text) ?? 0;
-      int jumlah = int.tryParse(jumlahController.text) ?? 0;
-      int? isi = isiController.text.isNotEmpty ? int.tryParse(isiController.text) : null;
+    void updateKonversi() {
+      final gula = int.tryParse(gulaController.text) ?? 0;
+      final jumlah = int.tryParse(jumlahController.text) ?? 0;
+      final konversi = (gula * jumlah) / 4.0;
+      konversiController.text = "${konversi.toStringAsFixed(1)} sdt";
+    }
 
-      if (gula <= 0 || jumlah <= 0) {
-        Get.snackbar("Error", "Kandungan gula dan jumlah bungkus harus diisi dengan benar!",
-            backgroundColor: Colors.red, colorText: Colors.white);
-        return;
-      }
+    gulaController.addListener(updateKonversi);
+    jumlahController.addListener(updateKonversi);
+    updateKonversi();
 
-      if (index == null) {
-        controller.addHistoryItem(
-          namaMakanan: namaController.text,
-          gulaPerBungkus: gula,
-          jumlahBungkus: jumlah,
-          isiPerBungkus: isi,
-        );
-      } else {
-        controller.editHistoryItem(
-          index,
-          namaMakanan: namaController.text,
-          gulaPerBungkus: gula,
-          jumlahBungkus: jumlah,
-          isiPerBungkus: isi,
-        );
-      }
-      Get.back();
-    },
-  );
-}
+    Get.bottomSheet(
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                index == null ? "Tambah Makanan" : "Edit Makanan",
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: namaController,
+                decoration:
+                    const InputDecoration(labelText: "Nama Makanan (opsional)"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: gulaController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: "Kandungan Gula per Bungkus (gram)*"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: jumlahController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Jumlah Bungkus*"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: isiController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: "Isi Makanan per Bungkus (opsional)"),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: konversiController,
+                readOnly: true,
+                style: const TextStyle(color: Colors.grey),
+                decoration: InputDecoration(
+                  labelText: "Total Gula (Sendok Teh)",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    child: const Text("Batal"),
+                    onPressed: () => Get.back(),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    onPressed: () {
+                      int gula = int.tryParse(gulaController.text) ?? 0;
+                      int jumlah = int.tryParse(jumlahController.text) ?? 0;
+                      int? isi = isiController.text.isNotEmpty
+                          ? int.tryParse(isiController.text)
+                          : null;
+
+                      if (gula <= 0 || jumlah <= 0) {
+                        Get.snackbar("Error",
+                            "Kandungan gula dan jumlah bungkus harus diisi dengan benar!",
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                        return;
+                      }
+
+                      if (index == null) {
+                        controller.addHistoryItem(
+                          namaMakanan: namaController.text,
+                          gulaPerBungkus: gula,
+                          jumlahBungkus: jumlah,
+                          isiPerBungkus: isi,
+                        );
+                      } else {
+                        controller.editHistoryItem(
+                          index,
+                          namaMakanan: namaController.text,
+                          gulaPerBungkus: gula,
+                          jumlahBungkus: jumlah,
+                          isiPerBungkus: isi,
+                        );
+                      }
+                      Get.back();
+                    },
+                    child: const Text("Simpan",
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
