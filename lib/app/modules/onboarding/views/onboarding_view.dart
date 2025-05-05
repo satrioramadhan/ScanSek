@@ -232,7 +232,7 @@ class OnboardingView extends GetView<OnboardingController> {
         ),
         SizedBox(height: 30),
         Text(
-          "Mulai hidup sehat\nbareng ScanSek!",
+          "Mulai hidup kontrol gula\nbareng ScanSek!",
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 20,

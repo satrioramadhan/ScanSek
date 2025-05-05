@@ -2,7 +2,7 @@
 
 <uses-permission android:name="android.permission.CAMERA" />
     <application
-        android:label="scan_sek"
+        android:label="ScanSek"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

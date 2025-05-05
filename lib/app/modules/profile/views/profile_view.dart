@@ -82,8 +82,8 @@ class ProfileView extends GetView<ProfileController> {
                 ),
               );
             }),
-            _menuItem(Icons.logout, "Keluar Akun", () {
-              Get.snackbar("Logout", "Fitur logout belum aktif bro");
+            _menuItem(Icons.logout, "Keluar Akun", () async {
+              await controller.logout();
             }),
           ],
         ),

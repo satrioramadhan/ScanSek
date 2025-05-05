@@ -1,138 +1,113 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/ocr_controller.dart';
-import '../../../themes/app_colors.dart'; // ← penting!
 import 'package:camera/camera.dart';
+import '../controllers/ocr_controller.dart';
+import '../../../themes/app_colors.dart';
 
 class OcrView extends GetView<OcrController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Scan Label Gula'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 2,
-      ),
+      backgroundColor: Colors.black,
       body: Obx(() {
         if (!controller.isCameraInitialized.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        return Column(
-          children: [
-            // Kamera Preview
-            AspectRatio(
-              aspectRatio: controller.cameraController.value.aspectRatio,
-              child: CameraPreview(controller.cameraController),
-            ),
-            const SizedBox(height: 10),
-
-            // Tombol Scan
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: controller.captureAndRecognizeText,
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text("Scan dari Kamera"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.colbutton,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    onPressed: controller.pickImageFromGallery,
-                    icon: const Icon(Icons.image),
-                    label: const Text("Unggah dari Galeri"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                  ),
-                ],
+        return SafeArea(
+          child: Stack(
+            children: [
+              // Kamera + tap deteksi manual
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  controller.triggerDetection();
+                  Future.delayed(const Duration(milliseconds: 1500), () {
+                    controller.triggerDetection();
+                  });
+                },
+                child: SizedBox.expand(
+                  child: CameraPreview(controller.cameraController),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              // Overlay Informasi Gula (atas tengah)
+              Positioned(
+                top: 20,
+                left: 20,
+                right: 20,
+                child: Obx(() {
+                  final sugar = controller.sugarGram.value;
 
-            // Hasil OCR & gula
-            Obx(() => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: controller.recognizedText.value.isNotEmpty
-                  ? Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.cardShadow,
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          )
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Hasil OCR:",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              )),
-                          const SizedBox(height: 6),
-                          Text(
-                            controller.recognizedText.value,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            controller.sugarGram.value > 0
-                                ? "${controller.sugarGram.value} gram gula ≈ ${controller.sugarTeaspoon.toStringAsFixed(2)} sdt"
-                                : "Tidak ditemukan info gula",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: controller.sugarGram.value > 0
-                                  ? Colors.green
-                                  : Colors.red,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (controller.sugarGram.value > 0)
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                Get.toNamed('/history', arguments: {
-                                  'openAddDialog': true,
-                                  'gulaGram': controller.sugarGram.value,
-                                });
-                              },
-                              icon: const Icon(Icons.check),
-                              label: const Text("Pilih Makanan Ini"),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.colbutton,
-                                foregroundColor: Colors.black,
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                            ),
-                        ],
-                      ),
-                    )
-                  : const Text(
-                      "Belum ada hasil, silakan scan.",
-                      style: TextStyle(color: AppColors.textSecondary),
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-            )),
-          ],
+                    child: sugar > 0
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Gula Terdeteksi:",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "$sugar gram gula ≈ ${controller.sugarTeaspoon.toStringAsFixed(2)} sdt",
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ],
+                          )
+                        : const Text(
+                            "Tidak ditemukan informasi gula",
+                            style: TextStyle(color: Colors.redAccent),
+                          ),
+                  );
+                }),
+              ),
+
+              // Tombol ceklis (bawah tengah)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 80),
+                  child: Obx(() {
+                    final sugar = controller.sugarGram.value;
+                    return sugar > 0
+                        ? FloatingActionButton.extended(
+                            backgroundColor: Colors.greenAccent,
+                            onPressed: () {
+                              Get.toNamed('/history', arguments: {
+                                'openAddDialog': true,
+                                'gulaGram': sugar,
+                              });
+                            },
+                            icon: const Icon(Icons.check, color: Colors.black),
+                            label: const Text(
+                              "Pilih",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          )
+                        : const SizedBox.shrink();
+                  }),
+                ),
+              ),
+
+              // Tombol Back (pojok kiri atas)
+              Positioned(
+                top: 10,
+                left: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    Get.back();
+                  },
+                ),
+              ),
+            ],
+          ),
         );
       }),
     );

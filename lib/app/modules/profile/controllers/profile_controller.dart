@@ -1,23 +1,12 @@
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:scan_sek/app/routes/app_pages.dart';
 
 class ProfileController extends GetxController {
-  //TODO: Implement ProfileController
-
-  final count = 0.obs;
-  @override
-  void onInit() {
-    super.onInit();
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // atau bisa pake remove('token'), dll
+    Get.offAllNamed(Routes.LOGIN);
+    Get.snackbar('Berhasil Logout', 'Kamu telah keluar dari akun');
   }
-
-  @override
-  void onReady() {
-    super.onReady();
-  }
-
-  @override
-  void onClose() {
-    super.onClose();
-  }
-
-  void increment() => count.value++;
 }

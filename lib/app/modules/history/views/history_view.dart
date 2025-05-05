@@ -30,6 +30,12 @@ class HistoryView extends GetView<HistoryController> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search, color: Colors.black87),
+            onPressed: () {
+              _showSearchBottomSheet(context);
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.calendar_today_outlined,
                 color: Colors.black87),
             onPressed: () async {
@@ -43,7 +49,7 @@ class HistoryView extends GetView<HistoryController> {
                 controller.changeSelectedDate(pickedDate);
               }
             },
-          )
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -83,6 +89,7 @@ class HistoryView extends GetView<HistoryController> {
                   ),
                 )),
           ),
+          SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Obx(() => Text(
@@ -200,7 +207,57 @@ class HistoryView extends GetView<HistoryController> {
     );
   }
 
-// _showAddEditDialog diubah biar lengkap:
+  void _showSearchBottomSheet(BuildContext context) {
+    final TextEditingController searchController = TextEditingController();
+
+    Get.bottomSheet(
+      Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Cari Makanan",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: searchController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Nama makanan...',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (val) => controller.updateSearchQuery(val),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    controller.updateSearchQuery('');
+                    Get.back();
+                  },
+                  child: Text("Reset"),
+                ),
+                ElevatedButton(
+                  onPressed: () => Get.back(),
+                  child: Text("Tutup"),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
   void _showAddEditDialog(BuildContext context,
       {int? index, HistoryItem? item, int? gulaDariOCR}) {
     final TextEditingController namaController =
@@ -294,23 +351,28 @@ class HistoryView extends GetView<HistoryController> {
                       backgroundColor: AppColors.primary,
                     ),
                     onPressed: () {
-                      int gula = int.tryParse(gulaController.text) ?? 0;
-                      int jumlah = int.tryParse(jumlahController.text) ?? 0;
-                      int? isi = isiController.text.isNotEmpty
-                          ? int.tryParse(isiController.text)
-                          : null;
+                      final int gula = int.tryParse(gulaController.text) ?? 0;
+                      final int jumlah =
+                          int.tryParse(jumlahController.text) ?? 0;
+                      final String nama = namaController.text.trim().isNotEmpty
+                          ? namaController.text.trim()
+                          : "(kamu ga ngisiin)";
+                      final int isi =
+                          int.tryParse(isiController.text) ?? 0; // default 0
 
                       if (gula <= 0 || jumlah <= 0) {
-                        Get.snackbar("Error",
-                            "Kandungan gula dan jumlah bungkus harus diisi dengan benar!",
-                            backgroundColor: Colors.red,
-                            colorText: Colors.white);
+                        Get.snackbar(
+                          "Error",
+                          "Kandungan gula dan jumlah bungkus harus diisi!",
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
                         return;
                       }
 
                       if (index == null) {
                         controller.addHistoryItem(
-                          namaMakanan: namaController.text,
+                          namaMakanan: nama,
                           gulaPerBungkus: gula,
                           jumlahBungkus: jumlah,
                           isiPerBungkus: isi,
@@ -318,12 +380,13 @@ class HistoryView extends GetView<HistoryController> {
                       } else {
                         controller.editHistoryItem(
                           index,
-                          namaMakanan: namaController.text,
+                          namaMakanan: nama,
                           gulaPerBungkus: gula,
                           jumlahBungkus: jumlah,
                           isiPerBungkus: isi,
                         );
                       }
+
                       Get.back();
                     },
                     child: const Text("Simpan",

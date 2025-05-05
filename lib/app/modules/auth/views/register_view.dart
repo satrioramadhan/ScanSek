@@ -145,8 +145,31 @@ class RegisterView extends StatelessWidget {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () => controller.register(
-                                    user.value, email.value, pass.value),
+                                onPressed: () {
+                                  if (user.value.isEmpty ||
+                                      email.value.isEmpty ||
+                                      pass.value.isEmpty ||
+                                      confirmPass.value.isEmpty) {
+                                    Get.snackbar(
+                                        'Error', 'Semua field wajib diisi');
+                                    return;
+                                  }
+
+                                  if (pass.value.length < 6) {
+                                    Get.snackbar(
+                                        'Error', 'Password minimal 6 karakter');
+                                    return;
+                                  }
+
+                                  if (pass.value != confirmPass.value) {
+                                    Get.snackbar('Error',
+                                        'Konfirmasi password tidak cocok');
+                                    return;
+                                  }
+
+                                  controller.register(
+                                      user.value, email.value, pass.value);
+                                },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.colbutton,
                                   shape: RoundedRectangleBorder(

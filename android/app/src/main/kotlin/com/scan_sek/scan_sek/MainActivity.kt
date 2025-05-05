@@ -1,4 +1,4 @@
-package com.scan_sek.scan_sek
+package com.scansek.app
 
 import io.flutter.embedding.android.FlutterActivity
 
