@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://164.92.109.4/';
+  static const String baseUrl = 'https://7593-103-166-147-253.ngrok-free.app/';
   static final Dio dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
@@ -19,11 +19,9 @@ class ApiService {
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove('token');
           await prefs.setBool('sudahLogin', false);
-
-          Get.snackbar("Sesi Berakhir", "Silakan login ulang");
-          Get.offAllNamed('/login'); // Ganti dengan route login kamu
+          Get.offAllNamed('/login');
         }
-        return handler.next(error); // Teruskan error
+        return handler.next(error);
       },
     ));
 }
