@@ -20,6 +20,7 @@ class AuthController extends GetxController {
 
         await prefs.setBool('sudahLogin', true);
         await prefs.setString('token', data['token']);
+        await prefs.setString('refresh_token', data['refresh_token']);
         await prefs.setString('username', user['username']);
         await prefs.setString('email', user['email']);
 

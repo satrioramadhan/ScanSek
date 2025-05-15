@@ -7,6 +7,35 @@ import '../../../themes/app_colors.dart';
 
 class HistoryView extends GetView<HistoryController> {
   @override
+  void _showTambahJamAirDialog(BuildContext context) {
+    final TextEditingController jamController = TextEditingController();
+
+    Get.defaultDialog(
+      title: "Tambah Jam Minum",
+      content: Column(
+        children: [
+          TextField(
+            controller: jamController,
+            decoration: InputDecoration(hintText: "Contoh: 14:30"),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              final jam = jamController.text.trim();
+              if (RegExp(r"^\d{2}:\d{2}$").hasMatch(jam)) {
+                Get.back();
+                Get.find<HistoryController>().tambahJamMinum(jam);
+              } else {
+                Get.snackbar("Format salah", "Gunakan format HH:mm");
+              }
+            },
+            child: Text("Simpan"),
+          )
+        ],
+      ),
+    );
+  }
+
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = Get.arguments;
@@ -17,8 +46,12 @@ class HistoryView extends GetView<HistoryController> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Riwayat Asupan Gula',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Obx(() => Text(
+              controller.selectedView.value == HistoryViewType.gula
+                  ? 'Riwayat Asupan Gula'
+                  : 'Riwayat Minum Air',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            )),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -52,11 +85,16 @@ class HistoryView extends GetView<HistoryController> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
-        onPressed: () => _showAddEditDialog(context),
-      ),
+      floatingActionButton: Obx(() {
+        if (controller.selectedView.value == HistoryViewType.gula) {
+          return FloatingActionButton(
+            backgroundColor: AppColors.primary,
+            child: const Icon(Icons.add),
+            onPressed: () => _showAddEditDialog(context),
+          );
+        }
+        return SizedBox.shrink();
+      }),
       body: Column(
         children: [
           Padding(
@@ -98,110 +136,60 @@ class HistoryView extends GetView<HistoryController> {
                       fontWeight: FontWeight.bold, fontSize: 16),
                 )),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Obx(() => ToggleButtons(
+                  borderRadius: BorderRadius.circular(10),
+                  fillColor: AppColors.primary,
+                  selectedColor: Colors.white,
+                  color: AppColors.primary,
+                  selectedBorderColor: AppColors.primary,
+                  borderColor: AppColors.primary,
+                  constraints:
+                      const BoxConstraints(minHeight: 36, minWidth: 100),
+                  isSelected: [
+                    controller.selectedView.value == HistoryViewType.gula,
+                    controller.selectedView.value == HistoryViewType.air,
+                  ],
+                  onPressed: (index) {
+                    controller.setView(index == 0
+                        ? HistoryViewType.gula
+                        : HistoryViewType.air);
+                  },
+                  children: const [
+                    Text('Gula', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text('Air', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                )),
+          ),
+          const SizedBox(height: 10),
           Expanded(
             child: Obx(() {
-              List<HistoryItem> items = controller.historyBySelectedDate;
-
-              return Column(
-                children: [
-                  // Card Total Konsumsi
-                  Card(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Total konsumsi gula: ${controller.totalGulaHariItu} gram (≈ ${controller.konversiTotalHariItu()} sdt)",
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Total minum air: ${controller.totalAirHariItu} gelas",
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                        ],
+              if (controller.selectedView.value == HistoryViewType.gula) {
+                final items = controller.historyBySelectedDate;
+                return _buildListGula(items);
+              } else {
+                final jamList = controller.jamMinumHariIni;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _showTambahJamAirDialog(context),
+                          icon: Icon(Icons.add),
+                          label: Text("Tambah Jam Minum Air"),
+                        ),
                       ),
                     ),
-                  ),
-
-                  // List Riwayat Makanan
-                  Expanded(
-                    child: items.isEmpty
-                        ? Center(
-                            child: Text(
-                              "Belum ada riwayat makanan 🍃",
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: items.length,
-                            itemBuilder: (context, index) {
-                              final item = items[index];
-                              return Card(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                elevation: 2,
-                                child: ListTile(
-                                  title: Text(
-                                    item.namaMakanan.isNotEmpty
-                                        ? item.namaMakanan
-                                        : "Makanan tidak diketahui",
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (item.isiPerBungkus != null)
-                                        Text(
-                                            "Isi Perungkus: ${item.isiPerBungkus} gram"),
-                                      Text(
-                                          "Jumlah Makan: ${item.jumlahBungkus} bungkus"),
-                                      Text(
-                                          "Kandungan Gula: ${item.gulaPerBungkus} gram/bungkus"),
-                                      Text(
-                                          "Total Gula: ${item.totalGula} gram (≈ ${item.konversiSendokTeh.toStringAsFixed(1)} sdt)"),
-                                      Text(
-                                          "Waktu Input: ${item.formattedTime}"),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit,
-                                            color: AppColors.primary),
-                                        onPressed: () => _showAddEditDialog(
-                                            context,
-                                            index: index,
-                                            item: item),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () =>
-                                            controller.deleteHistoryItem(index),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              );
+                    const SizedBox(height: 10),
+                    Expanded(child: _buildListAir(jamList)),
+                  ],
+                );
+              }
             }),
-          ),
+          )
         ],
       ),
     );
@@ -400,5 +388,124 @@ class HistoryView extends GetView<HistoryController> {
         ),
       ),
     );
+  }
+
+  Widget _buildListGula(List<HistoryItem> items) {
+    return Column(
+      children: [
+        Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Total konsumsi gula: ${Get.find<HistoryController>().totalGulaHariItu} gram (≈ ${Get.find<HistoryController>().konversiTotalHariItu()} sdt)",
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Total minum air: ${Get.find<HistoryController>().totalAirHariItu} gelas",
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: items.isEmpty
+              ? Center(
+                  child: Text("Belum ada riwayat makanan 🍃",
+                      style: TextStyle(color: AppColors.textSecondary)),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      elevation: 2,
+                      child: ListTile(
+                        title: Text(
+                          item.namaMakanan.isNotEmpty
+                              ? item.namaMakanan
+                              : "Makanan tidak diketahui",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (item.isiPerBungkus != null)
+                              Text(
+                                  "Isi Perbungkus: ${item.isiPerBungkus} gram"),
+                            Text("Jumlah Makan: ${item.jumlahBungkus} bungkus"),
+                            Text(
+                                "Kandungan Gula: ${item.gulaPerBungkus} gram/bungkus"),
+                            Text(
+                                "Total Gula: ${item.totalGula} gram (≈ ${item.konversiSendokTeh.toStringAsFixed(1)} sdt)"),
+                            Text("Waktu Input: ${item.formattedTime}"),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit,
+                                  color: AppColors.primary),
+                              onPressed: () => _showAddEditDialog(Get.context!,
+                                  index: index, item: item),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => Get.find<HistoryController>()
+                                  .deleteHistoryItem(index),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListAir(List<String> jamList) {
+    return jamList.isEmpty
+        ? Center(
+            child: Text("Belum ada riwayat minum air 💧",
+                style: TextStyle(color: AppColors.textSecondary)),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: jamList.length,
+            itemBuilder: (context, index) {
+              final jam = jamList[index];
+              return Card(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                elevation: 2,
+                child: ListTile(
+                  leading:
+                      const Icon(Icons.local_drink, color: Colors.lightBlue),
+                  title: Text("Minum air pukul $jam"),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () =>
+                        Get.find<HistoryController>().hapusJamMinum(jam),
+                  ),
+                ),
+              );
+            },
+          );
   }
 }
