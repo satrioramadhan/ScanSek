@@ -228,17 +228,25 @@ class RegisterView extends StatelessWidget {
   }
 
   Widget socialIcon(String assetPath) {
-    return Container(
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Color(0xFFF1F1F1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Image.asset(
-        assetPath,
-        height: 20,
-        width: 20,
-        fit: BoxFit.contain,
+    return GestureDetector(
+      onTap: () async {
+        Get.dialog(Center(child: CircularProgressIndicator()),
+            barrierDismissible: false);
+        await controller.signInWithGoogle();
+        Get.back(); // tutup loading dialog
+      },
+      child: Container(
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Color(0xFFF1F1F1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Image.asset(
+          assetPath,
+          height: 20,
+          width: 20,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }

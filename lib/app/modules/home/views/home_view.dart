@@ -8,6 +8,7 @@ import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 import '../../../data/services/gula_service.dart';
 import '../../../data/services/air_service.dart';
+import '../../../modules/history/controllers/history_controller.dart';
 
 class HomeView extends GetView<HomeController> {
   @override
@@ -18,8 +19,7 @@ class HomeView extends GetView<HomeController> {
         child: RefreshIndicator(
           onRefresh: () => controller.ambilDataHariIni(),
           child: SingleChildScrollView(
-            physics:
-                AlwaysScrollableScrollPhysics(), // Wajib untuk RefreshIndicator
+            physics: AlwaysScrollableScrollPhysics(),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 80),
               child: Column(
@@ -51,11 +51,11 @@ class HomeView extends GetView<HomeController> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Hi, Simon 👋",
+                                Obx(() => Text("Hi, ${controller.namaUser} 👋",
                                     style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white)),
+                                        color: Colors.white))),
                                 SizedBox(height: 4),
                                 Text("Semangat sehat hari ini!",
                                     style: TextStyle(color: Colors.white70)),
@@ -149,7 +149,7 @@ class HomeView extends GetView<HomeController> {
                                                     .totalGulaHariIni.value <
                                                 25) {
                                               textColor = const Color.fromARGB(
-                                                  255, 225, 104, 104);
+                                                  255, 247, 135, 117);
                                             } else if (controller
                                                     .totalGulaHariIni.value <
                                                 50) {
@@ -181,6 +181,8 @@ class HomeView extends GetView<HomeController> {
                                       onPressed: () async {
                                         await Get.toNamed(Routes.HISTORY,
                                             arguments: {'openAddDialog': true});
+                                        controller.ambilDataHariIni();
+                                        controller.ambilRiwayat3Hari();
                                       },
                                       icon: Icon(Icons.add_circle,
                                           color: AppColors.colbutton, size: 30),
@@ -276,8 +278,7 @@ class HomeView extends GetView<HomeController> {
                       children: [
                         menuTile(Icons.qr_code_scanner, "Scan Label",
                             () => Get.toNamed(Routes.OCR)),
-                        menuTile(Icons.history, "Riwayat",
-                            () => Get.toNamed(Routes.HISTORY)),
+                        menuTile(Icons.history, "Riwayat", bukaRiwayatHariIni),
                         menuTile(Icons.bar_chart, "Statistik",
                             () => Get.toNamed(Routes.STATISTICS)),
                         menuTile(Icons.flag, "Target",
@@ -296,33 +297,52 @@ class HomeView extends GetView<HomeController> {
                                 fontWeight: FontWeight.bold, fontSize: 16)),
                         SizedBox(height: 8),
                         Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black12, blurRadius: 4)
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("Teh Botol Sosro",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold)),
-                                  Text("19 gram gula",
-                                      style: TextStyle(
-                                          color: AppColors.textSecondary))
-                                ],
-                              ),
-                              Icon(Icons.fastfood, color: Colors.deepPurple)
-                            ],
-                          ),
-                        ),
+                            width: double.infinity,
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.card,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black12, blurRadius: 4)
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Obx(() => Text(
+                                          controller.makananTerakhir.value,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )),
+                                    Obx(() => controller.waktuMakananTerakhir
+                                            .value.isNotEmpty
+                                        ? Text(
+                                            controller
+                                                .waktuMakananTerakhir.value,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          )
+                                        : SizedBox.shrink()),
+                                    SizedBox(height: 4),
+                                    Obx(() => Text(
+                                          "${controller.gulaMakananTerakhir.value} gram gula",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        )),
+                                  ],
+                                ),
+                                Icon(Icons.fastfood, color: Colors.deepPurple),
+                              ],
+                            )),
                         SizedBox(height: 20),
                         Text("Air Putih Hari Ini",
                             style: TextStyle(
@@ -342,10 +362,16 @@ class HomeView extends GetView<HomeController> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Obx(() => Text(
-                                  "Sudah minum ${controller.totalGelasAir.value} gelas",
+                                  controller.jamMinumTerakhir.isEmpty
+                                      ? "Belum ada jam minum hari ini"
+                                      : "Terakhir minum: ${controller.jamMinumTerakhir.value}",
                                   style: TextStyle(fontSize: 16))),
                               IconButton(
-                                onPressed: controller.tambahAir,
+                                onPressed: () async {
+                                  await controller.tambahAirLangsung();
+                                  controller.ambilDataHariIni();
+                                  controller.ambilRiwayat3Hari();
+                                },
                                 icon: Icon(Icons.add_circle,
                                     color: AppColors.colbutton),
                               )
@@ -358,64 +384,23 @@ class HomeView extends GetView<HomeController> {
                                 fontWeight: FontWeight.bold, fontSize: 16)),
                         SizedBox(height: 8),
                         Obx(() {
-                          final now = DateTime.now();
-                          final dates = List.generate(
-                              3, (i) => now.subtract(Duration(days: i)));
+                          final dataList = controller.riwayat3Hari;
 
-                          return FutureBuilder(
-                            future: Future.wait(dates.map((date) async {
-                              final dateStr =
-                                  DateFormat('yyyy-MM-dd').format(date);
-                              final gulaRes =
-                                  await GulaService.ambilGula(tanggal: dateStr);
-                              final airRes = await AirService.ambilAir(dateStr);
+                          if (dataList.isEmpty) {
+                            return Center(child: Text("Belum ada data"));
+                          }
 
-                              int gula = 0, air = 0;
-
-                              if (gulaRes.statusCode == 200 &&
-                                  gulaRes.data['success'] == true) {
-                                for (var item in gulaRes.data['data']) {
-                                  gula += (item['totalGula'] as num).toInt();
-                                }
-                              }
-
-                              if (airRes.statusCode == 200 &&
-                                  airRes.data['success'] == true) {
-                                air = (airRes.data['data']['riwayatJamMinum']
-                                        as List)
-                                    .length;
-                              }
-
-                              return {
-                                "tanggal": date,
-                                "gula": gula,
-                                "air": air,
-                              };
-                            }).toList()),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState !=
-                                  ConnectionState.done) {
-                                return Center(
-                                    child: CircularProgressIndicator());
-                              }
-
-                              final dataList =
-                                  snapshot.data as List<Map<String, dynamic>>;
-
-                              return Column(
-                                children: dataList.map((data) {
-                                  final tgl = DateFormat('EEEE, d MMM', 'id_ID')
-                                      .format(data["tanggal"]);
-                                  return ListTile(
-                                    title: Text(tgl),
-                                    subtitle: Text(
-                                        "${data['gula']} gram gula, ${data['air']} gelas air"),
-                                    leading:
-                                        Icon(Icons.calendar_today_outlined),
-                                  );
-                                }).toList(),
+                          return Column(
+                            children: dataList.map((data) {
+                              final tgl = DateFormat('EEEE, d MMM', 'id_ID')
+                                  .format(data["tanggal"]);
+                              return ListTile(
+                                title: Text(tgl),
+                                subtitle: Text(
+                                    "${data['gula']} gram gula, ${data['air']} gelas air"),
+                                leading: Icon(Icons.calendar_today_outlined),
                               );
-                            },
+                            }).toList(),
                           );
                         }),
                         Text("Insight Gula",
@@ -490,5 +475,11 @@ class HomeView extends GetView<HomeController> {
         ],
       ),
     );
+  }
+
+  void bukaRiwayatHariIni() {
+    final controller = Get.put(HistoryController());
+    controller.changeSelectedDate(DateTime.now());
+    Get.toNamed(Routes.HISTORY);
   }
 }

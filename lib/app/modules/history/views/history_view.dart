@@ -8,7 +8,9 @@ import '../../../themes/app_colors.dart';
 class HistoryView extends GetView<HistoryController> {
   @override
   void _showTambahJamAirDialog(BuildContext context) {
-    final TextEditingController jamController = TextEditingController();
+    final TextEditingController jamController = TextEditingController(
+      text: TimeOfDay.now().format(context), // << otomatis isi jam sekarang
+    );
 
     Get.defaultDialog(
       title: "Tambah Jam Minum",
@@ -29,7 +31,7 @@ class HistoryView extends GetView<HistoryController> {
                 Get.snackbar("Format salah", "Gunakan format HH:mm");
               }
             },
-            child: Text("Simpan"),
+            child: const Text("Simpan"),
           )
         ],
       ),
@@ -62,12 +64,14 @@ class HistoryView extends GetView<HistoryController> {
           },
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {
-              _showSearchBottomSheet(context);
-            },
-          ),
+          Obx(() {
+            return controller.selectedView.value == HistoryViewType.gula
+                ? IconButton(
+                    icon: const Icon(Icons.search, color: Colors.black87),
+                    onPressed: () => _showSearchBottomSheet(context),
+                  )
+                : const SizedBox.shrink();
+          }),
           IconButton(
             icon: const Icon(Icons.calendar_today_outlined,
                 color: Colors.black87),
@@ -86,7 +90,8 @@ class HistoryView extends GetView<HistoryController> {
         ],
       ),
       floatingActionButton: Obx(() {
-        if (controller.selectedView.value == HistoryViewType.gula) {
+        if (controller.selectedView.value == HistoryViewType.gula &&
+            controller.isTodaySelected) {
           return FloatingActionButton(
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.add),
@@ -146,7 +151,7 @@ class HistoryView extends GetView<HistoryController> {
                   selectedBorderColor: AppColors.primary,
                   borderColor: AppColors.primary,
                   constraints:
-                      const BoxConstraints(minHeight: 36, minWidth: 100),
+                      const BoxConstraints(minHeight: 40, minWidth: 100),
                   isSelected: [
                     controller.selectedView.value == HistoryViewType.gula,
                     controller.selectedView.value == HistoryViewType.air,
@@ -155,6 +160,11 @@ class HistoryView extends GetView<HistoryController> {
                     controller.setView(index == 0
                         ? HistoryViewType.gula
                         : HistoryViewType.air);
+                    controller.pageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
                   },
                   children: const [
                     Text('Gula', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -164,32 +174,18 @@ class HistoryView extends GetView<HistoryController> {
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: Obx(() {
-              if (controller.selectedView.value == HistoryViewType.gula) {
-                final items = controller.historyBySelectedDate;
-                return _buildListGula(items);
-              } else {
-                final jamList = controller.jamMinumHariIni;
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showTambahJamAirDialog(context),
-                          icon: Icon(Icons.add),
-                          label: Text("Tambah Jam Minum Air"),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(child: _buildListAir(jamList)),
-                  ],
-                );
-              }
-            }),
-          )
+            child: PageView(
+              controller: controller.pageController,
+              onPageChanged: (index) {
+                controller.setView(
+                    index == 0 ? HistoryViewType.gula : HistoryViewType.air);
+              },
+              children: [
+                Obx(() => _buildListGula(controller.historyBySelectedDate)),
+                Obx(() => _buildListAir(controller.jamMinumHariIni)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -404,18 +400,26 @@ class HistoryView extends GetView<HistoryController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Total konsumsi gula: ${Get.find<HistoryController>().totalGulaHariItu} gram (≈ ${Get.find<HistoryController>().konversiTotalHariItu()} sdt)",
+                  "Total konsumsi gula: ${controller.totalGulaHariItu} gram (≈ ${controller.konversiTotalHariItu()} sdt)",
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "Total minum air: ${Get.find<HistoryController>().totalAirHariItu} gelas",
+                  "Total minum air: ${controller.totalAirHariItu} gelas",
                   style: const TextStyle(fontSize: 16),
                 ),
               ],
             ),
           ),
         ),
+        if (!controller.isTodaySelected)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              "Data tidak dapat diubah di tanggal ini",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
         Expanded(
           child: items.isEmpty
               ? Center(
@@ -453,22 +457,27 @@ class HistoryView extends GetView<HistoryController> {
                             Text("Waktu Input: ${item.formattedTime}"),
                           ],
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit,
-                                  color: AppColors.primary),
-                              onPressed: () => _showAddEditDialog(Get.context!,
-                                  index: index, item: item),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => Get.find<HistoryController>()
-                                  .deleteHistoryItem(index),
-                            ),
-                          ],
-                        ),
+                        trailing: controller.isTodaySelected
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit,
+                                        color: AppColors.primary),
+                                    onPressed: () => _showAddEditDialog(
+                                        Get.context!,
+                                        index: index,
+                                        item: item),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () =>
+                                        _showConfirmDelete(context, index),
+                                  ),
+                                ],
+                              )
+                            : null,
                       ),
                     );
                   },
@@ -479,33 +488,99 @@ class HistoryView extends GetView<HistoryController> {
   }
 
   Widget _buildListAir(List<String> jamList) {
-    return jamList.isEmpty
-        ? Center(
-            child: Text("Belum ada riwayat minum air 💧",
-                style: TextStyle(color: AppColors.textSecondary)),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: jamList.length,
-            itemBuilder: (context, index) {
-              final jam = jamList[index];
-              return Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                elevation: 2,
-                child: ListTile(
-                  leading:
-                      const Icon(Icons.local_drink, color: Colors.lightBlue),
-                  title: Text("Minum air pukul $jam"),
-                  trailing: IconButton(
-                    icon: Icon(Icons.delete, color: Colors.red),
-                    onPressed: () =>
-                        Get.find<HistoryController>().hapusJamMinum(jam),
-                  ),
+    final jamList = controller.jamMinumHariIni;
+
+    return Column(
+      children: [
+        Card(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              "Total minum air: ${controller.totalAirHariItu} gelas",
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ),
+        if (controller.isTodaySelected)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 20, bottom: 8),
+              child: FloatingActionButton.small(
+                backgroundColor: AppColors.primary,
+                child: Icon(Icons.add, color: Colors.white),
+                onPressed: () => _showTambahJamAirDialog(Get.context!),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: jamList.isEmpty
+              ? Center(
+                  child: Text("Belum ada riwayat minum air 💧",
+                      style: TextStyle(color: AppColors.textSecondary)),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: jamList.length,
+                  itemBuilder: (context, index) {
+                    final jam = jamList[index];
+
+                    return Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      elevation: 2,
+                      child: ListTile(
+                        leading: const Icon(Icons.local_drink,
+                            color: Colors.lightBlue),
+                        title: Text("Minum air pukul $jam"),
+                        trailing: controller.isTodaySelected
+                            ? IconButton(
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () =>
+                                    _showConfirmDeleteJam(context, jam),
+                              )
+                            : null,
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          );
+        ),
+      ],
+    );
+  }
+
+  void _showConfirmDelete(BuildContext context, int index) {
+    Get.defaultDialog(
+      title: "Hapus Data?",
+      middleText: "Apakah kamu yakin ingin menghapus data ini?",
+      textCancel: "Batal",
+      textConfirm: "Hapus",
+      confirmTextColor: Colors.white,
+      onConfirm: () {
+        Get.back();
+        controller.deleteHistoryItem(index);
+      },
+    );
+  }
+
+  void _showConfirmDeleteJam(BuildContext context, String jam) {
+    Get.defaultDialog(
+      title: "Hapus Jam Minum?",
+      middleText: "Yakin ingin hapus jam $jam?",
+      textCancel: "Batal",
+      textConfirm: "Hapus",
+      confirmTextColor: Colors.white,
+      onConfirm: () {
+        Get.back();
+        controller.hapusJamMinum(jam);
+      },
+    );
   }
 }

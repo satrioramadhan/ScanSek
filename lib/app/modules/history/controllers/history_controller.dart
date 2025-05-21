@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/history_item.dart';
 import '../../../data/services/gula_service.dart';
@@ -19,6 +20,13 @@ class HistoryController extends GetxController {
 
   var allWater = <Map<String, dynamic>>[].obs;
   var jamMinumHariIni = <String>[].obs; // << TAMBAH INI
+  late PageController pageController;
+
+  @override
+  void onInit() {
+    super.onInit();
+    pageController = PageController(initialPage: 0);
+  }
 
   List<HistoryItem> get historyBySelectedDate {
     return allHistory.where((item) {
@@ -95,7 +103,15 @@ class HistoryController extends GetxController {
       final res = await AirService.ambilAir(tanggalStr);
       if (res.statusCode == 200 && res.data['success'] == true) {
         final List<dynamic> riwayat = res.data['data']['riwayatJamMinum'] ?? [];
+
         jamMinumHariIni.value = List<String>.from(riwayat);
+
+        // ⬅️ Tambahkan ini supaya totalAirHariItu bisa dapat data
+        allWater.removeWhere((item) => isSameDate(item["tanggal"], tanggal));
+        allWater.add({
+          "tanggal": tanggal,
+          "jumlahGelas": jamMinumHariIni.length,
+        });
       } else {
         jamMinumHariIni.clear();
         if (kDebugMode) print("Gagal ambil air: ${res.data}");
@@ -196,11 +212,22 @@ class HistoryController extends GetxController {
 
   // minum
   Future<void> tambahJamMinum(String jam) async {
+    if (jamMinumHariIni.contains(jam)) {
+      Get.snackbar('Gagal', 'Kamu sudah menambahkan jam ini');
+      return;
+    }
+
     final tanggalStr = DateFormat('yyyy-MM-dd').format(selectedDate.value);
     try {
       final res = await AirService.tambahJamMinum(tanggalStr, jam);
       if (res.statusCode == 201 && res.data['success'] == true) {
         jamMinumHariIni.add(jam);
+        allWater.removeWhere(
+            (item) => isSameDate(item["tanggal"], selectedDate.value));
+        allWater.add({
+          "tanggal": selectedDate.value,
+          "jumlahGelas": jamMinumHariIni.length,
+        });
         Get.snackbar('Berhasil', 'Jam minum ditambahkan');
       } else {
         Get.snackbar('Gagal', res.data['message'] ?? 'Gagal tambah jam minum');
@@ -216,6 +243,15 @@ class HistoryController extends GetxController {
       final res = await AirService.hapusJam(tanggalStr, jam);
       if (res.statusCode == 200 && res.data['success'] == true) {
         jamMinumHariIni.remove(jam);
+
+        // ⬅️ Update total air lokal juga
+        allWater.removeWhere(
+            (item) => isSameDate(item["tanggal"], selectedDate.value));
+        allWater.add({
+          "tanggal": selectedDate.value,
+          "jumlahGelas": jamMinumHariIni.length,
+        });
+
         Get.snackbar('Berhasil', 'Jam minum berhasil dihapus');
       } else {
         Get.snackbar('Gagal', res.data['message'] ?? 'Gagal hapus jam minum');
@@ -223,5 +259,12 @@ class HistoryController extends GetxController {
     } catch (e) {
       Get.snackbar('Error', 'Terjadi kesalahan: $e');
     }
+  }
+
+  bool get isTodaySelected {
+    final now = DateTime.now();
+    return selectedDate.value.year == now.year &&
+        selectedDate.value.month == now.month &&
+        selectedDate.value.day == now.day;
   }
 }
