@@ -12,6 +12,12 @@ abstract class Routes {
   static const TARGET = _Paths.TARGET;
   static const BERITA = _Paths.BERITA;
   static const PROFILE = _Paths.PROFILE;
+  static const UPDATE_PROFILE = _Paths.UPDATE_PROFILE;  // 🔥 Tambahin ini!
+
+  // 🔥 Tambahkan rute reset password flow
+  static const FORGOT_PASSWORD = _Paths.FORGOT_PASSWORD;
+  static const VERIFY_RESET_OTP = _Paths.VERIFY_RESET_OTP;
+  static const SET_NEW_PASSWORD = _Paths.SET_NEW_PASSWORD;
 }
 
 abstract class _Paths {
@@ -25,4 +31,10 @@ abstract class _Paths {
   static const TARGET = '/target';
   static const BERITA = '/berita';
   static const PROFILE = '/profile';
+  static const UPDATE_PROFILE = '/update-profile';  // 🔥 Sudah ada
+
+  // 🔥 Tambahkan path reset password flow
+  static const FORGOT_PASSWORD = '/forgot-password';
+  static const VERIFY_RESET_OTP = '/verify-reset-otp';
+  static const SET_NEW_PASSWORD = '/set-new-password';
 }

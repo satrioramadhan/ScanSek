@@ -4,6 +4,8 @@ import 'package:table_calendar/table_calendar.dart';
 import '../controllers/history_controller.dart';
 import '../../../data/models/history_item.dart';
 import '../../../themes/app_colors.dart';
+import 'package:scan_sek/app/utils/snackbar_helper.dart';
+import 'package:scan_sek/app/utils/conversion_helper.dart';
 
 class HistoryView extends GetView<HistoryController> {
   @override
@@ -95,7 +97,8 @@ class HistoryView extends GetView<HistoryController> {
           return FloatingActionButton(
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.add),
-            onPressed: () => _showAddEditDialog(context),
+            onPressed: () =>
+                _showAddEditDialog(context), // Tetep bro, biar konsisten
           );
         }
         return SizedBox.shrink();
@@ -192,7 +195,8 @@ class HistoryView extends GetView<HistoryController> {
   }
 
   void _showSearchBottomSheet(BuildContext context) {
-    final TextEditingController searchController = TextEditingController();
+    final TextEditingController searchController = TextEditingController(
+        text: controller.searchQuery.value); // 🔥 isi awal dari query
 
     Get.bottomSheet(
       Container(
@@ -214,27 +218,30 @@ class HistoryView extends GetView<HistoryController> {
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'Nama makanan...',
-                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.grey[100],
+                contentPadding:
+                    EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30), // 🔥 bentuk tabung
+                  borderSide: BorderSide.none,
+                ),
               ),
-              onChanged: (val) => controller.updateSearchQuery(val),
             ),
             SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    controller.updateSearchQuery('');
-                    Get.back();
-                  },
-                  child: Text("Reset"),
+            ElevatedButton(
+              onPressed: () {
+                controller.updateSearchQuery(searchController.text.trim());
+                Get.back(); // 🔥 tutup field
+              },
+              child: Text("Cari"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
                 ),
-                ElevatedButton(
-                  onPressed: () => Get.back(),
-                  child: Text("Tutup"),
-                ),
-              ],
-            )
+              ),
+            ),
           ],
         ),
       ),
@@ -253,13 +260,15 @@ class HistoryView extends GetView<HistoryController> {
         TextEditingController(text: item?.jumlahBungkus.toString() ?? '');
     final TextEditingController isiController =
         TextEditingController(text: item?.isiPerBungkus?.toString() ?? '');
-    final TextEditingController konversiController = TextEditingController();
+
+    String selectedSatuan = 'gram'; // default
+    RxDouble totalGram = 0.0.obs;
 
     void updateKonversi() {
-      final gula = int.tryParse(gulaController.text) ?? 0;
-      final jumlah = int.tryParse(jumlahController.text) ?? 0;
-      final konversi = (gula * jumlah) / 4.0;
-      konversiController.text = "${konversi.toStringAsFixed(1)} sdt";
+      final gulaInput = double.tryParse(gulaController.text) ?? 0.0;
+      final jumlah = double.tryParse(jumlahController.text) ?? 0.0;
+      totalGram.value =
+          ConversionHelper.toGram(gulaInput, selectedSatuan) * jumlah;
     }
 
     gulaController.addListener(updateKonversi);
@@ -268,117 +277,200 @@ class HistoryView extends GetView<HistoryController> {
 
     Get.bottomSheet(
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 20,
-          left: 20,
-          right: 20,
+      backgroundColor: Colors.transparent,
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
+        padding: EdgeInsets.fromLTRB(
+            24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                index == null ? "Tambah Makanan" : "Edit Makanan",
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: namaController,
-                decoration:
-                    const InputDecoration(labelText: "Nama Makanan (opsional)"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: gulaController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: "Kandungan Gula per Bungkus (gram)*"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: jumlahController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Jumlah Bungkus*"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: isiController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                    labelText: "Isi Makanan per Bungkus (opsional)"),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: konversiController,
-                readOnly: true,
-                style: const TextStyle(color: Colors.grey),
-                decoration: InputDecoration(
-                  labelText: "Total Gula (Sendok Teh)",
-                  filled: true,
-                  fillColor: Colors.grey[100],
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  index == null ? "Tambah Item" : "Edit Item",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Nama Item
+              TextField(
+                controller: namaController,
+                decoration: InputDecoration(
+                  hintText: "Nama item (contoh: Teh Manis, Roti, Jus)",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Kandungan Gula + Satuan
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: gulaController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Kandungan gula",
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        contentPadding:
+                            EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: selectedSatuan,
+                      items: ['gram', 'sdt', 'sdm']
+                          .map((e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(e.toUpperCase()),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        selectedSatuan = val!;
+                        updateKonversi();
+                      },
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        contentPadding:
+                            EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Obx(() => Text(
+                    ConversionHelper.format(totalGram.value),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  )),
+              const SizedBox(height: 16),
+
+              // Jumlah Item
+              TextField(
+                controller: jumlahController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Jumlah item",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Isi per Item
+              TextField(
+                controller: isiController,
+                decoration: InputDecoration(
+                  hintText: "Isi per item (opsional, contoh: 200 ml, 1 gelas)",
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Tombol Aksi
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    child: const Text("Batal"),
                     onPressed: () => Get.back(),
+                    child:
+                        Text("Cancel", style: TextStyle(color: Colors.black54)),
                   ),
+                  const SizedBox(width: 8),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
                     onPressed: () {
-                      final int gula = int.tryParse(gulaController.text) ?? 0;
+                      final double gulaInput =
+                          double.tryParse(gulaController.text) ?? 0.0;
                       final int jumlah =
                           int.tryParse(jumlahController.text) ?? 0;
                       final String nama = namaController.text.trim().isNotEmpty
                           ? namaController.text.trim()
-                          : "(kamu ga ngisiin)";
-                      final int isi =
-                          int.tryParse(isiController.text) ?? 0; // default 0
+                          : "(tidak diisi)";
+                      final String isi = isiController.text.trim();
 
-                      if (gula <= 0 || jumlah <= 0) {
-                        Get.snackbar(
-                          "Error",
-                          "Kandungan gula dan jumlah bungkus harus diisi!",
-                          backgroundColor: Colors.red,
-                          colorText: Colors.white,
-                        );
+                      if (gulaInput <= 0 || jumlah <= 0) {
+                        SnackbarHelper.show("❌ Error",
+                            "Kandungan gula dan jumlah item harus diisi!",
+                            type: "error");
                         return;
                       }
+
+                      final int gulaPerItemGram =
+                          ConversionHelper.toGram(gulaInput, selectedSatuan)
+                              .toInt();
 
                       if (index == null) {
                         controller.addHistoryItem(
                           namaMakanan: nama,
-                          gulaPerBungkus: gula,
+                          gulaPerBungkus: gulaPerItemGram,
                           jumlahBungkus: jumlah,
-                          isiPerBungkus: isi,
+                          isiPerBungkus: isi.isNotEmpty ? isi : null,
                         );
                       } else {
                         controller.editHistoryItem(
                           index,
                           namaMakanan: nama,
-                          gulaPerBungkus: gula,
+                          gulaPerBungkus: gulaPerItemGram,
                           jumlahBungkus: jumlah,
-                          isiPerBungkus: isi,
+                          isiPerBungkus: isi.isNotEmpty ? isi : null,
                         );
                       }
-
                       Get.back();
                     },
-                    child: const Text("Simpan",
-                        style: TextStyle(color: Colors.white)),
+                    child: Text("Simpan"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
             ],
           ),
         ),
@@ -400,7 +492,7 @@ class HistoryView extends GetView<HistoryController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Total konsumsi gula: ${controller.totalGulaHariItu} gram (≈ ${controller.konversiTotalHariItu()} sdt)",
+                  "Total konsumsi gula: ${ConversionHelper.format(controller.totalGulaHariItu.toDouble())}",
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 4),
@@ -423,8 +515,10 @@ class HistoryView extends GetView<HistoryController> {
         Expanded(
           child: items.isEmpty
               ? Center(
-                  child: Text("Belum ada riwayat makanan 🍃",
-                      style: TextStyle(color: AppColors.textSecondary)),
+                  child: Text(
+                    "Belum ada riwayat item 🍃",
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -440,20 +534,19 @@ class HistoryView extends GetView<HistoryController> {
                         title: Text(
                           item.namaMakanan.isNotEmpty
                               ? item.namaMakanan
-                              : "Makanan tidak diketahui",
+                              : "Item tidak diketahui",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (item.isiPerBungkus != null)
-                              Text(
-                                  "Isi Perbungkus: ${item.isiPerBungkus} gram"),
-                            Text("Jumlah Makan: ${item.jumlahBungkus} bungkus"),
+                              Text("Isi Perbungkus: ${item.isiPerBungkus}"),
+                            Text("Jumlah: ${item.jumlahBungkus}"),
                             Text(
-                                "Kandungan Gula: ${item.gulaPerBungkus} gram/bungkus"),
+                                "Kandungan Gula: ${item.gulaPerBungkus} gram/item"),
                             Text(
-                                "Total Gula: ${item.totalGula} gram (≈ ${item.konversiSendokTeh.toStringAsFixed(1)} sdt)"),
+                                "Total Gula: ${ConversionHelper.format(item.totalGula.toDouble())}"),
                             Text("Waktu Input: ${item.formattedTime}"),
                           ],
                         ),

@@ -236,34 +236,65 @@ class HomeView extends GetView<HomeController> {
                         ),
                         SizedBox(width: 12),
                         Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.card,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(color: Colors.black12, blurRadius: 4)
-                              ],
-                            ),
-                            padding: EdgeInsets.all(16),
-                            height: 180,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Lottie.asset('assets/lottie/glass.json',
-                                    height: 90),
-                                SizedBox(height: 8),
-                                Obx(() => Text(
-                                      "${controller.totalGelasAir.value} gelas hari ini",
-                                      style: TextStyle(
+                          child: GestureDetector(
+                            onTap: () {
+                              controller.triggerFastAnimation(
+                                controller: controller
+                                    .airLottieController, // khusus animasi gelas
+                                durationMs: 300,
+                              );
+                              controller.tambahAirLangsung();
+                              controller.ambilDataHariIni();
+                              controller.ambilRiwayat3Hari();
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.card,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black12, blurRadius: 4),
+                                ],
+                              ),
+                              padding: EdgeInsets.all(16),
+                              height: 180,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Lottie.asset(
+                                      'assets/lottie/glass.json',
+                                      controller: controller
+                                          .airLottieController, // animasi gelas
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Obx(() => Text(
+                                        "${controller.totalGelasAir.value} gelas hari ini",
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: AppColors.textSecondary),
-                                    )),
-                                SizedBox(height: 4),
-                                Text("Target: 8 gelas/hari",
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      )),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    "Target: 8 gelas/hari",
                                     style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary))
-                              ],
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    "Klik gelas untuk tambah",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -366,15 +397,6 @@ class HomeView extends GetView<HomeController> {
                                       ? "Belum ada jam minum hari ini"
                                       : "Terakhir minum: ${controller.jamMinumTerakhir.value}",
                                   style: TextStyle(fontSize: 16))),
-                              IconButton(
-                                onPressed: () async {
-                                  await controller.tambahAirLangsung();
-                                  controller.ambilDataHariIni();
-                                  controller.ambilRiwayat3Hari();
-                                },
-                                icon: Icon(Icons.add_circle,
-                                    color: AppColors.colbutton),
-                              )
                             ],
                           ),
                         ),

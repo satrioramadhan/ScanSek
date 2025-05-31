@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../themes/app_colors.dart';
 import 'package:scan_sek/app/modules/auth/controllers/auth_controller.dart';
+import 'package:scan_sek/app/routes/app_pages.dart';
+import 'package:scan_sek/app/utils/snackbar_helper.dart'; // Import SnackbarHelper
 
 class LoginView extends StatelessWidget {
   final controller = Get.find<AuthController>();
@@ -107,11 +109,11 @@ class LoginView extends StatelessWidget {
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () {},
-                                child: Text(
-                                  "Lupa Kata Sandi?",
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
+                                onPressed: () {
+                                  Get.toNamed(Routes.FORGOT_PASSWORD);
+                                },
+                                child: Text("Lupa Kata Sandi?",
+                                    style: TextStyle(color: Colors.grey[600])),
                               ),
                             ),
                             SizedBox(height: 10),
@@ -121,18 +123,17 @@ class LoginView extends StatelessWidget {
                                 onPressed: () {
                                   if (email.value.isEmpty ||
                                       password.value.isEmpty) {
-                                    Get.snackbar('Error',
-                                        'Email dan password wajib diisi');
+                                    SnackbarHelper.show('Error',
+                                        'Email dan password wajib diisi',
+                                        type: 'error');
                                     return;
                                   }
-
                                   controller.login(email.value, password.value);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.fabColor,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
+                                      borderRadius: BorderRadius.circular(15)),
                                   padding: EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 child: Text("Masuk",
@@ -191,7 +192,6 @@ class LoginView extends StatelessWidget {
         Get.dialog(Center(child: CircularProgressIndicator()),
             barrierDismissible: false);
         await controller.signInWithGoogle();
-        Get.back(); // tutup loading dialog
       },
       child: Container(
         padding: EdgeInsets.all(10),
@@ -199,12 +199,8 @@ class LoginView extends StatelessWidget {
           color: Color(0xFFF1F1F1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Image.asset(
-          assetPath,
-          height: 20,
-          width: 20,
-          fit: BoxFit.contain,
-        ),
+        child:
+            Image.asset(assetPath, height: 20, width: 20, fit: BoxFit.contain),
       ),
     );
   }

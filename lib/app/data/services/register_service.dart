@@ -4,7 +4,7 @@ import 'api_service.dart';
 class RegisterService {
   static Future<Response> registerUser(
       String username, String email, String password) async {
-    return await ApiService.dio.post('/auth/register', data: {
+    return await ApiService.dioClient.post('/auth/register', data: {
       'username': username,
       'email': email,
       'password': password,

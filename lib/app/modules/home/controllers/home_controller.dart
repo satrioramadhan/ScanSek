@@ -35,15 +35,23 @@ class HomeController extends GetxController
       lottieAlignmentMap[asset] ?? Alignment.center;
 
   late AnimationController lottieController;
+  late AnimationController airLottieController;
 
   @override
   void onInit() {
     super.onInit();
-    WidgetsBinding.instance.addObserver(this); // <--- tambahin ini
+    WidgetsBinding.instance.addObserver(this);
     lottieController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+
+    airLottieController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    airLottieController.repeat();
+    ;
 
     ambilNamaUser();
     ambilDataHariIni();
@@ -61,6 +69,7 @@ class HomeController extends GetxController
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
     lottieController.dispose();
+    airLottieController.dispose(); // 🔥 tambahin ini
     super.onClose();
   }
 
@@ -105,27 +114,38 @@ class HomeController extends GetxController
       final resGula = await GulaService.ambilGula(tanggal: today);
       if (resGula.statusCode == 200 && resGula.data['success'] == true) {
         final List<dynamic> data = resGula.data['data'];
-        int totalGula = 0;
-        for (var item in data) {
-          totalGula += (item['totalGula'] as num).toInt();
-        }
-        totalGulaHariIni.value = totalGula;
+
+        // 🔥 Bersihin data dari item yang nggak valid (misal waktuInput null)
+        data.removeWhere((item) => item['waktuInput'] == null);
+
+        // 🔥 Hitung totalGula clean
+        totalGulaHariIni.value = data.fold(
+            0, (sum, item) => sum + (item['totalGula'] as num).toInt());
 
         if (data.isNotEmpty) {
-          final lastItem = data.last;
+          // 🔥 Urutin data descending berdasarkan waktuInput biar yang terbaru di depan
+          data.sort((a, b) => DateTime.parse(b['waktuInput'])
+              .compareTo(DateTime.parse(a['waktuInput'])));
+          final lastItem = data.first;
+
           makananTerakhir.value =
               lastItem['namaMakanan'] ?? "(tidak diketahui)";
           gulaMakananTerakhir.value = (lastItem['totalGula'] as num).toInt();
 
-          // ambil waktu input
+          // 🔥 Ambil waktu input dengan aman
           final waktu = lastItem['waktuInput'];
-          if (waktu != null) {
-            final dt = DateTime.tryParse(waktu);
-            if (dt != null) {
-              waktuMakananTerakhir.value =
-                  DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(dt);
-            }
+          final dt = DateTime.tryParse(waktu);
+          if (dt != null) {
+            waktuMakananTerakhir.value =
+                DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(dt);
+          } else {
+            waktuMakananTerakhir.value = "(waktu tidak valid)";
           }
+        } else {
+          // 🔥 Reset makanan terakhir kalau data kosong
+          makananTerakhir.value = "(belum ada)";
+          gulaMakananTerakhir.value = 0;
+          waktuMakananTerakhir.value = "";
         }
       }
 
@@ -136,17 +156,17 @@ class HomeController extends GetxController
             resAir.data['data']['riwayatJamMinum'] ?? [];
         totalGelasAir.value = jamList.length;
         if (jamList.isNotEmpty) {
-          final lastTime = jamList.last; // misal "22:45"
+          final lastTime = jamList.last;
           final fullDateTimeStr = "$today $lastTime";
-
-          // Format lengkap: yyyy-MM-dd HH:mm
           final dt = DateTime.tryParse(fullDateTimeStr);
           if (dt != null) {
             jamMinumTerakhir.value =
                 DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(dt);
           } else {
-            jamMinumTerakhir.value = lastTime; // fallback aja kalau gagal parse
+            jamMinumTerakhir.value = lastTime;
           }
+        } else {
+          jamMinumTerakhir.value = "";
         }
       }
 
@@ -224,5 +244,18 @@ class HomeController extends GetxController
       print("Gagal ambil riwayat 3 hari: $e");
       riwayat3Hari.clear();
     }
+  }
+
+  void triggerFastAnimation(
+      {AnimationController? controller, int? durationMs}) {
+    final usedController = controller ?? lottieController; // default ke gula
+
+    usedController.stop();
+    usedController.duration = Duration(seconds: 1, milliseconds: 300);
+    usedController.reset();
+    usedController.forward().then((_) {
+      usedController.duration = const Duration(seconds: 2); // default balik
+      usedController.repeat();
+    });
   }
 }

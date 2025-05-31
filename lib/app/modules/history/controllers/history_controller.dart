@@ -4,11 +4,14 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/history_item.dart';
 import '../../../data/services/gula_service.dart';
-import '../../../data/services/air_service.dart'; // << TAMBAH INI
+import '../../../data/services/air_service.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../../home/controllers/home_controller.dart';
 import 'package:flutter/foundation.dart';
+import 'package:scan_sek/app/utils/snackbar_helper.dart';
+import 'package:scan_sek/app/utils/conversion_helper.dart'; // 🔥 Import helper konversi
 
-enum HistoryViewType { gula, air } // << TAMBAH ENUM
+enum HistoryViewType { gula, air }
 
 class HistoryController extends GetxController {
   var selectedDate = DateTime.now().obs;
@@ -16,16 +19,23 @@ class HistoryController extends GetxController {
   var searchQuery = ''.obs;
 
   var allHistory = <HistoryItem>[].obs;
-  var selectedView = HistoryViewType.gula.obs; // << TAMBAH INI
+  var selectedView = HistoryViewType.gula.obs;
 
   var allWater = <Map<String, dynamic>>[].obs;
-  var jamMinumHariIni = <String>[].obs; // << TAMBAH INI
+  var jamMinumHariIni = <String>[].obs;
   late PageController pageController;
 
   @override
   void onInit() {
     super.onInit();
     pageController = PageController(initialPage: 0);
+    ever(selectedDate, (_) => searchQuery.value = '');
+  }
+
+  @override
+  void onClose() {
+    searchQuery.value = '';
+    super.onClose();
   }
 
   List<HistoryItem> get historyBySelectedDate {
@@ -72,9 +82,9 @@ class HistoryController extends GetxController {
     return DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(date);
   }
 
+  // 🔥 Update fungsi konversi total hari itu pakai helper
   String konversiTotalHariItu() {
-    double sendokTeh = totalGulaHariItu / 4.0;
-    return sendokTeh.toStringAsFixed(1);
+    return ConversionHelper.format(totalGulaHariItu.toDouble());
   }
 
   Future<void> getRiwayatFromAPI(DateTime tanggal) async {
@@ -88,12 +98,13 @@ class HistoryController extends GetxController {
             data.map((json) => HistoryItem.fromJson(json)).toList();
       } else {
         if (kDebugMode) print("Gagal ambil data: ${response.data}");
-        Get.snackbar(
-            'Gagal', response.data['message'] ?? 'Tidak bisa ambil data');
+        SnackbarHelper.show(
+            "Gagal", response.data['message'] ?? 'Tidak bisa ambil data',
+            type: 'error');
       }
     } catch (e) {
       if (kDebugMode) print("Error ambil data: $e");
-      Get.snackbar('Error', 'Terjadi kesalahan: $e');
+      SnackbarHelper.show("Error", 'Terjadi kesalahan: $e', type: 'error');
     }
   }
 
@@ -103,10 +114,7 @@ class HistoryController extends GetxController {
       final res = await AirService.ambilAir(tanggalStr);
       if (res.statusCode == 200 && res.data['success'] == true) {
         final List<dynamic> riwayat = res.data['data']['riwayatJamMinum'] ?? [];
-
         jamMinumHariIni.value = List<String>.from(riwayat);
-
-        // ⬅️ Tambahkan ini supaya totalAirHariItu bisa dapat data
         allWater.removeWhere((item) => isSameDate(item["tanggal"], tanggal));
         allWater.add({
           "tanggal": tanggal,
@@ -126,7 +134,7 @@ class HistoryController extends GetxController {
     String namaMakanan = "",
     required int gulaPerBungkus,
     required int jumlahBungkus,
-    int? isiPerBungkus,
+    String? isiPerBungkus,
   }) async {
     final newItem = HistoryItem(
       namaMakanan: namaMakanan,
@@ -141,14 +149,27 @@ class HistoryController extends GetxController {
       if (res.statusCode == 201 && res.data['success'] == true) {
         final itemBaru = HistoryItem.fromJson(res.data['data']);
         allHistory.add(itemBaru);
-        Get.snackbar('Berhasil', 'Data berhasil disimpan');
+        SnackbarHelper.show("Berhasil", "Data berhasil disimpan",
+            type: "success");
+
+        // 🔥 Tambahin ini bro biar refresh di HomeView
+        final homeController = Get.find<HomeController>();
+        homeController.ambilDataHariIni();
+        homeController.makananTerakhir.value =
+            itemBaru.namaMakanan ?? "(tidak diketahui)";
+        homeController.gulaMakananTerakhir.value = itemBaru.totalGula;
+        homeController.waktuMakananTerakhir.value =
+            DateFormat('d MMM yyyy, HH:mm', 'id_ID')
+                .format(itemBaru.waktuInput);
       } else {
         if (kDebugMode) print("Gagal tambah data: ${res.data}");
-        Get.snackbar('Gagal', res.data['message'] ?? 'Gagal simpan data');
+        SnackbarHelper.show("Gagal", res.data['message'] ?? 'Gagal simpan data',
+            type: "error");
       }
     } catch (e) {
       if (kDebugMode) print("Error tambah data: $e");
-      Get.snackbar('Error', 'Terjadi kesalahan saat simpan: $e');
+      SnackbarHelper.show("Error", "Terjadi kesalahan saat simpan: $e",
+          type: "error");
     }
   }
 
@@ -157,17 +178,15 @@ class HistoryController extends GetxController {
     String namaMakanan = "",
     required int gulaPerBungkus,
     required int jumlahBungkus,
-    int? isiPerBungkus,
+    String? isiPerBungkus,
   }) async {
     var item = historyBySelectedDate[index];
     int allIndex = allHistory.indexOf(item);
     if (allIndex != -1) {
-      final updatedItem = HistoryItem(
-        id: item.id,
+      final updatedItem = item.copyWith(
         namaMakanan: namaMakanan,
         gulaPerBungkus: gulaPerBungkus,
         jumlahBungkus: jumlahBungkus,
-        waktuInput: item.waktuInput,
         isiPerBungkus: isiPerBungkus,
       );
 
@@ -175,14 +194,18 @@ class HistoryController extends GetxController {
         final res = await GulaService.updateGula(item.id!, updatedItem);
         if (res.statusCode == 200 && res.data['success'] == true) {
           allHistory[allIndex] = updatedItem;
-          Get.snackbar('Berhasil', 'Data berhasil diperbarui');
+          SnackbarHelper.show("Berhasil", "Data berhasil diperbarui",
+              type: "success");
         } else {
           if (kDebugMode) print("Gagal update data: ${res.data}");
-          Get.snackbar('Gagal', res.data['message'] ?? 'Gagal update data');
+          SnackbarHelper.show(
+              "Gagal", res.data['message'] ?? 'Gagal update data',
+              type: "error");
         }
       } catch (e) {
         if (kDebugMode) print("Error update data: $e");
-        Get.snackbar('Error', 'Terjadi kesalahan saat update: $e');
+        SnackbarHelper.show("Error", "Terjadi kesalahan saat update: $e",
+            type: "error");
       }
     }
   }
@@ -193,14 +216,17 @@ class HistoryController extends GetxController {
       final res = await GulaService.deleteGula(item.id!);
       if (res.statusCode == 200 && res.data['success'] == true) {
         allHistory.remove(item);
-        Get.snackbar('Berhasil', 'Data berhasil dihapus');
+        SnackbarHelper.show("Berhasil", "Data berhasil dihapus",
+            type: "success");
       } else {
         if (kDebugMode) print("Gagal hapus data: ${res.data}");
-        Get.snackbar('Gagal', res.data['message'] ?? 'Gagal hapus data');
+        SnackbarHelper.show("Gagal", res.data['message'] ?? 'Gagal hapus data',
+            type: "error");
       }
     } catch (e) {
       if (kDebugMode) print("Error hapus data: $e");
-      Get.snackbar('Error', 'Terjadi kesalahan saat hapus: $e');
+      SnackbarHelper.show("Error", "Terjadi kesalahan saat hapus: $e",
+          type: "error");
     }
   }
 
@@ -210,10 +236,10 @@ class HistoryController extends GetxController {
         date1.day == date2.day;
   }
 
-  // minum
   Future<void> tambahJamMinum(String jam) async {
     if (jamMinumHariIni.contains(jam)) {
-      Get.snackbar('Gagal', 'Kamu sudah menambahkan jam ini');
+      SnackbarHelper.show("Gagal", "Kamu sudah menambahkan jam ini",
+          type: "warning");
       return;
     }
 
@@ -228,12 +254,15 @@ class HistoryController extends GetxController {
           "tanggal": selectedDate.value,
           "jumlahGelas": jamMinumHariIni.length,
         });
-        Get.snackbar('Berhasil', 'Jam minum ditambahkan');
+        SnackbarHelper.show("Berhasil", "Jam minum ditambahkan",
+            type: "success");
       } else {
-        Get.snackbar('Gagal', res.data['message'] ?? 'Gagal tambah jam minum');
+        SnackbarHelper.show(
+            "Gagal", res.data['message'] ?? 'Gagal tambah jam minum',
+            type: "error");
       }
     } catch (e) {
-      Get.snackbar('Error', 'Terjadi kesalahan: $e');
+      SnackbarHelper.show("Error", "Terjadi kesalahan: $e", type: "error");
     }
   }
 
@@ -243,21 +272,21 @@ class HistoryController extends GetxController {
       final res = await AirService.hapusJam(tanggalStr, jam);
       if (res.statusCode == 200 && res.data['success'] == true) {
         jamMinumHariIni.remove(jam);
-
-        // ⬅️ Update total air lokal juga
         allWater.removeWhere(
             (item) => isSameDate(item["tanggal"], selectedDate.value));
         allWater.add({
           "tanggal": selectedDate.value,
           "jumlahGelas": jamMinumHariIni.length,
         });
-
-        Get.snackbar('Berhasil', 'Jam minum berhasil dihapus');
+        SnackbarHelper.show("Berhasil", "Jam minum berhasil dihapus",
+            type: "success");
       } else {
-        Get.snackbar('Gagal', res.data['message'] ?? 'Gagal hapus jam minum');
+        SnackbarHelper.show(
+            "Gagal", res.data['message'] ?? 'Gagal hapus jam minum',
+            type: "error");
       }
     } catch (e) {
-      Get.snackbar('Error', 'Terjadi kesalahan: $e');
+      SnackbarHelper.show("Error", "Terjadi kesalahan: $e", type: "error");
     }
   }
 

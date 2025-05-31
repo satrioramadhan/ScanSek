@@ -11,6 +11,7 @@ class StatisticsController extends GetxController {
 
   var gulaHarian = <int>[].obs;
   var airHarian = <int>[].obs;
+  var labelHarian = <String>[].obs; // 🔥 Tambahin buat label dinamis
 
   final int targetGulaPerHari = 25;
   late PageController pageController;
@@ -45,12 +46,17 @@ class StatisticsController extends GetxController {
   Future<void> fetchWeeklyData() async {
     gulaHarian.clear();
     airHarian.clear();
+    labelHarian.clear(); // 🔥 Tambahin buat label
 
     final today = DateTime.now();
 
     for (int i = 6; i >= 0; i--) {
+      // dari 6 hari lalu ke hari ini
       final date = today.subtract(Duration(days: i));
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      final label = DateFormat('E').format(date); // 🔥 Contoh label Sen, Sel
+
+      labelHarian.add(label); // 🔥 Tambahin label list
 
       try {
         // GULA

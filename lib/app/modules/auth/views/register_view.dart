@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:scan_sek/app/modules/auth/controllers/auth_controller.dart';
 import 'package:scan_sek/app/themes/app_colors.dart';
+import 'package:scan_sek/app/utils/snackbar_helper.dart'; // Import SnackbarHelper
 
 class RegisterView extends StatelessWidget {
   final controller = Get.find<AuthController>();
@@ -150,31 +151,30 @@ class RegisterView extends StatelessWidget {
                                       email.value.isEmpty ||
                                       pass.value.isEmpty ||
                                       confirmPass.value.isEmpty) {
-                                    Get.snackbar(
-                                        'Error', 'Semua field wajib diisi');
+                                    SnackbarHelper.show(
+                                        'Error', 'Semua field wajib diisi',
+                                        type: 'error');
                                     return;
                                   }
-
                                   if (pass.value.length < 6) {
-                                    Get.snackbar(
-                                        'Error', 'Password minimal 6 karakter');
+                                    SnackbarHelper.show(
+                                        'Error', 'Password minimal 6 karakter',
+                                        type: 'error');
                                     return;
                                   }
-
                                   if (pass.value != confirmPass.value) {
-                                    Get.snackbar('Error',
-                                        'Konfirmasi password tidak cocok');
+                                    SnackbarHelper.show('Error',
+                                        'Konfirmasi password tidak cocok',
+                                        type: 'error');
                                     return;
                                   }
-
                                   controller.register(
                                       user.value, email.value, pass.value);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.colbutton,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
+                                      borderRadius: BorderRadius.circular(15)),
                                   padding: EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 child: Text("Daftar",
@@ -189,9 +189,7 @@ class RegisterView extends StatelessWidget {
                             SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                socialIcon('assets/icons/google.png'),
-                              ],
+                              children: [socialIcon('assets/icons/google.png')],
                             ),
                             SizedBox(height: 20),
                             Center(
@@ -233,7 +231,7 @@ class RegisterView extends StatelessWidget {
         Get.dialog(Center(child: CircularProgressIndicator()),
             barrierDismissible: false);
         await controller.signInWithGoogle();
-        Get.back(); // tutup loading dialog
+        Get.back();
       },
       child: Container(
         padding: EdgeInsets.all(10),
@@ -241,12 +239,8 @@ class RegisterView extends StatelessWidget {
           color: Color(0xFFF1F1F1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Image.asset(
-          assetPath,
-          height: 20,
-          width: 20,
-          fit: BoxFit.contain,
-        ),
+        child:
+            Image.asset(assetPath, height: 20, width: 20, fit: BoxFit.contain),
       ),
     );
   }

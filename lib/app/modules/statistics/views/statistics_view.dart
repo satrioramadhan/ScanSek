@@ -28,41 +28,46 @@ class StatisticsView extends StatelessWidget {
           children: [
             Center(
               child: Obx(() => ToggleButtons(
-                borderRadius: BorderRadius.circular(10),
-                fillColor: AppColors.primary,
-                selectedColor: Colors.white,
-                color: AppColors.primary,
-                selectedBorderColor: AppColors.primary,
-                borderColor: AppColors.primary,
-                constraints: const BoxConstraints(minHeight: 40, minWidth: 100),
-                isSelected: [
-                  controller.selectedChart.value == ChartType.gula,
-                  controller.selectedChart.value == ChartType.air,
-                ],
-                onPressed: (index) {
-                  controller.setChartType(index == 0 ? ChartType.gula : ChartType.air);
-                  controller.pageController.animateToPage(
-                    index,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                children: const [
-                  Text('Gula', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text('Air', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              )),
+                    borderRadius: BorderRadius.circular(10),
+                    fillColor: AppColors.primary,
+                    selectedColor: Colors.white,
+                    color: AppColors.primary,
+                    selectedBorderColor: AppColors.primary,
+                    borderColor: AppColors.primary,
+                    constraints:
+                        const BoxConstraints(minHeight: 40, minWidth: 100),
+                    isSelected: [
+                      controller.selectedChart.value == ChartType.gula,
+                      controller.selectedChart.value == ChartType.air,
+                    ],
+                    onPressed: (index) {
+                      controller.setChartType(
+                          index == 0 ? ChartType.gula : ChartType.air);
+                      controller.pageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    children: const [
+                      Text('Gula',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Air',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  )),
             ),
             const SizedBox(height: 20),
             Expanded(
               child: PageView(
                 controller: controller.pageController,
                 onPageChanged: (index) {
-                  controller.setChartType(index == 0 ? ChartType.gula : ChartType.air);
+                  controller.setChartType(
+                      index == 0 ? ChartType.gula : ChartType.air);
                 },
                 children: [
-                  BarChart(_buildGulaChart(controller)),
-                  BarChart(_buildAirChart(controller)),
+                  Obx(() => BarChart(_buildGulaChart(controller))),
+                  Obx(() => BarChart(_buildAirChart(controller))),
                 ],
               ),
             ),
@@ -81,15 +86,18 @@ class StatisticsView extends StatelessWidget {
                       style: const TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                     const SizedBox(height: 10),
-                    if (controller.totalGulaHariIni > controller.targetGulaPerHari)
+                    if (controller.totalGulaHariIni >
+                        controller.targetGulaPerHari)
                       const Text(
                         "⚠️ Kamu melebihi target gula hari ini!",
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.red, fontWeight: FontWeight.bold),
                       )
                     else
                       const Text(
                         "✅ Kamu masih dalam batas aman hari ini!",
-                        style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.bold),
                       ),
                   ],
                 );
@@ -116,15 +124,21 @@ class StatisticsView extends StatelessWidget {
   }
 
   BarChartData _buildGulaChart(StatisticsController controller) {
+    // 🔥 Cari nilai maksimum gulaHarian biar maxY fleksibel
+    final maxData = controller.gulaHarian.isNotEmpty
+        ? controller.gulaHarian.reduce((a, b) => a > b ? a : b)
+        : 60;
+    final kelipatan = maxData <= 60 ? 10 : 20;
+    final maxY =
+        ((maxData / kelipatan).ceil()) * kelipatan; // 🔥 maxY fleksibel
+
     return BarChartData(
       alignment: BarChartAlignment.spaceAround,
-      maxY: 60,
+      maxY: maxY.toDouble(), // 🔥 Pakai maxY dinamis
       barTouchData: BarTouchData(
         enabled: true,
         touchTooltipData: BarTouchTooltipData(
-          getTooltipColor: (group){
-            return const Color.fromARGB(255, 171, 166, 166);
-          },
+          getTooltipColor: (group) => const Color.fromARGB(255, 171, 166, 166),
           tooltipPadding: const EdgeInsets.all(8),
           tooltipRoundedRadius: 8,
           getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -132,10 +146,7 @@ class StatisticsView extends StatelessWidget {
             final sendokTeh = (gram / 4).toStringAsFixed(1);
             return BarTooltipItem(
               "$gram gram\n≈ $sendokTeh sdt",
-              const TextStyle(
-                color: Color.fromARGB(255, 255, 255, 255),
-                fontWeight: FontWeight.bold,
-              ),
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             );
           },
         ),
@@ -145,9 +156,10 @@ class StatisticsView extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             getTitlesWidget: (value, meta) {
-              final days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-              if (value.toInt() >= 0 && value.toInt() < days.length) {
-                return Text(days[value.toInt()], style: const TextStyle(fontSize: 10));
+              final index = value.toInt();
+              if (index >= 0 && index < controller.labelHarian.length) {
+                return Text(controller.labelHarian[index],
+                    style: const TextStyle(fontSize: 10));
               }
               return const Text('');
             },
@@ -160,12 +172,20 @@ class StatisticsView extends StatelessWidget {
       borderData: FlBorderData(show: false),
       barGroups: List.generate(controller.gulaHarian.length, (index) {
         final value = controller.gulaHarian[index];
+        Color barColor;
+        if (value <= 30) {
+          barColor = Colors.blue; // 🔵 biru
+        } else if (value <= 49) {
+          barColor = Colors.yellow; // 🟡 kuning
+        } else {
+          barColor = Colors.red; // 🔴 merah
+        }
         return BarChartGroupData(
           x: index,
           barRods: [
             BarChartRodData(
               toY: value.toDouble(),
-              color: value > controller.targetGulaPerHari ? Colors.red : AppColors.primary,
+              color: barColor,
               width: 16,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -182,17 +202,14 @@ class StatisticsView extends StatelessWidget {
       barTouchData: BarTouchData(
         enabled: true,
         touchTooltipData: BarTouchTooltipData(
-          getTooltipColor: (group) => const Color.fromARGB(255, 170, 170, 170), // << Warna background tooltip AIR
+          getTooltipColor: (group) => const Color.fromARGB(255, 170, 170, 170),
           tooltipPadding: const EdgeInsets.all(8),
           tooltipRoundedRadius: 8,
           getTooltipItem: (group, groupIndex, rod, rodIndex) {
             final gelas = rod.toY.toStringAsFixed(0);
             return BarTooltipItem(
               "$gelas gelas",
-              const TextStyle(
-                color: Color.fromARGB(255, 255, 255, 255), // << Warna tulisan tooltip AIR
-                fontWeight: FontWeight.bold,
-              ),
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             );
           },
         ),
@@ -202,9 +219,10 @@ class StatisticsView extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             getTitlesWidget: (value, meta) {
-              final days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-              if (value.toInt() >= 0 && value.toInt() < days.length) {
-                return Text(days[value.toInt()], style: const TextStyle(fontSize: 10));
+              final index = value.toInt();
+              if (index >= 0 && index < controller.labelHarian.length) {
+                return Text(controller.labelHarian[index],
+                    style: const TextStyle(fontSize: 10));
               }
               return const Text('');
             },
@@ -231,5 +249,4 @@ class StatisticsView extends StatelessWidget {
       }),
     );
   }
-
 }
