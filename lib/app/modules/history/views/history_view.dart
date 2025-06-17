@@ -6,12 +6,13 @@ import '../../../data/models/history_item.dart';
 import '../../../themes/app_colors.dart';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
 import 'package:scan_sek/app/utils/conversion_helper.dart';
+import 'package:scan_sek/app/routes/app_pages.dart';
 
 class HistoryView extends GetView<HistoryController> {
   @override
   void _showTambahJamAirDialog(BuildContext context) {
     final TextEditingController jamController = TextEditingController(
-      text: TimeOfDay.now().format(context), // << otomatis isi jam sekarang
+      text: TimeOfDay.now().format(context),
     );
 
     Get.defaultDialog(
@@ -40,13 +41,28 @@ class HistoryView extends GetView<HistoryController> {
     );
   }
 
+  @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = Get.arguments;
-      if (args != null && args['openAddDialog'] == true) {
-        _showAddEditDialog(context, gulaDariOCR: args['gulaGram']);
+
+      if (args != null &&
+          args['openAddDialog'] == true &&
+          !controller.dialogSudahDibuka.value) {
+        controller.dialogSudahDibuka.value = true;
+
+        controller.setView(HistoryViewType.gula);
+        controller.pageController.jumpToPage(0);
+
+        _showAddEditDialog(
+          context,
+          gulaDariOCR: args['gulaGram'],
+          autoJumlah: args['autoJumlah'],
+          autoSatuan: args['autoSatuan'],
+        );
       }
     });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -97,8 +113,7 @@ class HistoryView extends GetView<HistoryController> {
           return FloatingActionButton(
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.add),
-            onPressed: () =>
-                _showAddEditDialog(context), // Tetep bro, biar konsisten
+            onPressed: () => _showAddEditDialog(context),
           );
         }
         return SizedBox.shrink();
@@ -195,8 +210,8 @@ class HistoryView extends GetView<HistoryController> {
   }
 
   void _showSearchBottomSheet(BuildContext context) {
-    final TextEditingController searchController = TextEditingController(
-        text: controller.searchQuery.value); // 🔥 isi awal dari query
+    final TextEditingController searchController =
+        TextEditingController(text: controller.searchQuery.value);
 
     Get.bottomSheet(
       Container(
@@ -223,7 +238,7 @@ class HistoryView extends GetView<HistoryController> {
                 contentPadding:
                     EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30), // 🔥 bentuk tabung
+                  borderRadius: BorderRadius.circular(30),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -232,7 +247,7 @@ class HistoryView extends GetView<HistoryController> {
             ElevatedButton(
               onPressed: () {
                 controller.updateSearchQuery(searchController.text.trim());
-                Get.back(); // 🔥 tutup field
+                Get.back();
               },
               child: Text("Cari"),
               style: ElevatedButton.styleFrom(
@@ -250,18 +265,23 @@ class HistoryView extends GetView<HistoryController> {
   }
 
   void _showAddEditDialog(BuildContext context,
-      {int? index, HistoryItem? item, int? gulaDariOCR}) {
+      {int? index,
+      HistoryItem? item,
+      double? gulaDariOCR,
+      int? autoJumlah,
+      String? autoSatuan}) {
     final TextEditingController namaController =
         TextEditingController(text: item?.namaMakanan ?? '');
     final TextEditingController gulaController = TextEditingController(
       text: gulaDariOCR?.toString() ?? item?.gulaPerBungkus.toString() ?? '',
     );
-    final TextEditingController jumlahController =
-        TextEditingController(text: item?.jumlahBungkus.toString() ?? '');
+    final TextEditingController jumlahController = TextEditingController(
+      text: autoJumlah?.toString() ?? item?.jumlahBungkus?.toString() ?? '',
+    );
     final TextEditingController isiController =
         TextEditingController(text: item?.isiPerBungkus?.toString() ?? '');
 
-    String selectedSatuan = 'gram'; // default
+    String selectedSatuan = autoSatuan ?? 'gram';
     RxDouble totalGram = 0.0.obs;
 
     void updateKonversi() {

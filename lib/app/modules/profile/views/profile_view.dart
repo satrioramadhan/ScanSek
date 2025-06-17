@@ -1,117 +1,139 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../themes/app_colors.dart';
-import '../controllers/profile_controller.dart';
-import '../../../routes/app_pages.dart'; // 🔥 Import Routes biar bisa pakai Routes.UPDATE_PROFILE
+import 'package:scan_sek/app/modules/profile/controllers/profile_controller.dart';
+import 'package:scan_sek/app/modules/profile/views/update_profile_view.dart';
+import 'package:scan_sek/app/modules/profile/views/login_history_view.dart';
+import 'package:scan_sek/app/themes/app_colors.dart';
 
-class ProfileView extends GetView<ProfileController> {
+class ProfileView extends StatelessWidget {
+  final controller = Get.find<ProfileController>();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF6F7FB),
       appBar: AppBar(
-        title: Text("Profil"),
-        backgroundColor: AppColors.primary,
+        title: Text("Profil Saya"),
+        backgroundColor: AppColors.fabColor,
         foregroundColor: Colors.white,
-        elevation: 2,
+        centerTitle: true,
+        elevation: 0,
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return Center(child: CircularProgressIndicator());
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: ListView(
+        children: [
+          const SizedBox(height: 20),
+          _buildHeader(),
+          const SizedBox(height: 16),
+          _buildSectionCard(
             children: [
-              /// HEADER PROFILE
-              Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 35,
-                      backgroundImage: NetworkImage(
-                        'https://source.unsplash.com/100x100/?person,profile',
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          controller.username.value,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          controller.email.value,
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (controller.reminder.value.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              controller.reminder.value,
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+              _buildMenuItem(
+                icon: Icons.person_outline,
+                title: "Ubah Profil",
+                onTap: () => Get.to(() => UpdateProfileView()),
               ),
-
-              SizedBox(height: 30),
-
-              /// 🔥 Button Ubah Data Akun
-              ElevatedButton.icon(
-                onPressed: () {
-                  Get.toNamed(Routes.UPDATE_PROFILE);
-                },
-                icon: Icon(Icons.edit),
-                label: Text("Ubah Data Akun"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
+              _buildMenuItem(
+                icon: Icons.history,
+                title: "Riwayat Login",
+                onTap: () => Get.to(() => LoginHistoryView()),
               ),
-
-              SizedBox(height: 30),
-
-              /// 🔥 Menu Lainnya
-              _menuItem(Icons.logout, "Keluar Akun", () async {
-                await controller.logout();
-              }),
             ],
           ),
-        );
-      }),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            children: [
+              _buildMenuItem(
+                icon: Icons.logout,
+                title: "Keluar",
+                onTap: controller.logout,
+                iconColor: Colors.red,
+              ),
+            ],
+          ),
+          const SizedBox(height: 30),
+        ],
+      ),
     );
   }
 
-  Widget _menuItem(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(vertical: 4),
-      leading: Icon(icon, color: AppColors.primary),
-      title: Text(label),
-      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+  Widget _buildHeader() {
+    return Obx(() {
+      final username = controller.username.value;
+      final email = controller.email.value;
+
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.fabColor.withOpacity(0.9), AppColors.fabColor],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.fabColor.withOpacity(0.3),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            const CircleAvatar(
+              radius: 35,
+              backgroundImage: AssetImage("assets/images/avatar.png"),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              username.isEmpty ? "Pengguna" : username,
+              style: const TextStyle(
+                  fontSize: 20,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold),
+            ),
+            Text(
+              email.isEmpty ? "-" : email,
+              style: const TextStyle(fontSize: 14, color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildSectionCard({required List<Widget> children}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          )
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color iconColor = Colors.black54,
+  }) {
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: ListTile(
+        leading: Icon(icon, color: iconColor),
+        title: Text(title),
+        trailing: const Icon(Icons.chevron_right, size: 20),
+      ),
     );
   }
 }

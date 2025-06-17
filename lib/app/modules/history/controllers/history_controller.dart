@@ -9,7 +9,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../home/controllers/home_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
-import 'package:scan_sek/app/utils/conversion_helper.dart'; // 🔥 Import helper konversi
+import 'package:scan_sek/app/utils/conversion_helper.dart';
 
 enum HistoryViewType { gula, air }
 
@@ -23,6 +23,8 @@ class HistoryController extends GetxController {
 
   var allWater = <Map<String, dynamic>>[].obs;
   var jamMinumHariIni = <String>[].obs;
+  final dialogSudahDibuka = false.obs;
+
   late PageController pageController;
 
   @override
@@ -35,6 +37,7 @@ class HistoryController extends GetxController {
   @override
   void onClose() {
     searchQuery.value = '';
+    dialogSudahDibuka.value = false;
     super.onClose();
   }
 
@@ -82,7 +85,6 @@ class HistoryController extends GetxController {
     return DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(date);
   }
 
-  // 🔥 Update fungsi konversi total hari itu pakai helper
   String konversiTotalHariItu() {
     return ConversionHelper.format(totalGulaHariItu.toDouble());
   }
@@ -152,7 +154,6 @@ class HistoryController extends GetxController {
         SnackbarHelper.show("Berhasil", "Data berhasil disimpan",
             type: "success");
 
-        // 🔥 Tambahin ini bro biar refresh di HomeView
         final homeController = Get.find<HomeController>();
         homeController.ambilDataHariIni();
         homeController.makananTerakhir.value =

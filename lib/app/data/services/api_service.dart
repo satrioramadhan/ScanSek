@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://164.92.109.4/api';
+  static const String baseUrl = 'http://172.184.197.28/api';
 
   static final dio.Dio dioClient = dio.Dio(
     dio.BaseOptions(
@@ -84,5 +84,19 @@ class ApiService {
   static Future<dio.Response> verifyResetOtp(String email, String otp) {
     return dioClient
         .post('/auth/verify-reset-otp', data: {'email': email, 'otp': otp});
+  }
+
+  static Future<void> logLoginActivity(Map<String, dynamic> deviceInfo) async {
+    final timestamp = DateTime.now().toUtc().toIso8601String();
+    final body = {
+      "timestamp": timestamp,
+      "device": deviceInfo,
+    };
+
+    print("📤 Mengirim log login ke backend: $body");
+
+    final res = await dioClient.post('/auth/log-login', data: body);
+
+    print("✅ Response dari backend: ${res.statusCode} ${res.data}");
   }
 }

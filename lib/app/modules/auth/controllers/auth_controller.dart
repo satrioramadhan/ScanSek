@@ -12,6 +12,7 @@ import 'package:scan_sek/app/modules/auth/views/verify_reset_otp_view.dart'
 import 'package:scan_sek/app/modules/auth/views/set_new_password_view.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
+import 'package:scan_sek/app/utils/device_helper.dart';
 import 'package:dio/dio.dart' as dio;
 
 class AuthController extends GetxController {
@@ -26,6 +27,15 @@ class AuthController extends GetxController {
         // ✅ Login sukses
         final data = res.data['data'];
         await _saveLoginData(data);
+        final deviceInfo = await DeviceHelper.getDeviceInfo();
+        print("📤 Kirim log login: $deviceInfo");
+
+        try {
+          await ApiService.logLoginActivity(deviceInfo);
+          print("✅ Log login terkirim!");
+        } catch (e) {
+          print("❌ Gagal kirim log login: $e");
+        }
         SnackbarHelper.show(
             'Berhasil', res.data['message'] ?? 'Login berhasil!',
             type: 'success');
@@ -79,7 +89,7 @@ class AuthController extends GetxController {
     } on dio.DioException catch (e) {
       print('Dio error: ${e.response?.statusCode}, data: ${e.response?.data}');
       if (e.response?.data != null && e.response?.data['otp_sent'] == true) {
-        // ✅ Handle OTP dikirim walau di error
+        
         final user = e.response?.data['user'];
         final refreshToken = e.response?.data['refresh_token'];
         final prefs = await SharedPreferences.getInstance();

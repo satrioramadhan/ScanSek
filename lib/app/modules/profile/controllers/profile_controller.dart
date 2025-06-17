@@ -8,8 +8,6 @@ class ProfileController extends GetxController {
   var email = ''.obs;
   var reminder = ''.obs;
   var isLoading = true.obs;
-
-  // 🔥 Fields untuk Update Profile
   var newUsername = ''.obs;
   var newEmail = ''.obs;
   var newPassword = ''.obs;
@@ -17,6 +15,7 @@ class ProfileController extends GetxController {
   var showCurrentPasswordField = false.obs;
   var obscureNewPassword = true.obs;
   var obscureCurrentPassword = true.obs;
+  final loginHistory = <Map<String, dynamic>>[].obs;
 
   @override
   void onInit() {
@@ -83,6 +82,17 @@ class ProfileController extends GetxController {
       }
     } catch (e) {
       Get.snackbar('Error', e.toString());
+    }
+  }
+
+  Future<void> fetchLoginHistory() async {
+    try {
+      final res = await ApiService.dioClient.get('/auth/login-history');
+      if (res.statusCode == 200 && res.data['success'] == true) {
+        loginHistory.value = List<Map<String, dynamic>>.from(res.data['data']);
+      }
+    } catch (e) {
+      print("Gagal ambil login history: $e");
     }
   }
 

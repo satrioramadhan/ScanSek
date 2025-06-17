@@ -24,6 +24,7 @@ import '../modules/statistics/bindings/statistics_binding.dart';
 import '../modules/statistics/views/statistics_view.dart';
 import '../modules/target/bindings/target_binding.dart';
 import '../modules/target/views/target_view.dart';
+import '../modules/profile/views/login_history_view.dart';
 
 part 'app_routes.dart';
 
@@ -115,8 +116,14 @@ class AppPages {
     GetPage(
       name: Routes.UPDATE_PROFILE,
       page: () => UpdateProfileView(),
-      binding: BindingsBuilder(
-          () => Get.put(ProfileController())), // 🔥 pakai controller yang sama
+      binding: BindingsBuilder(() => Get.put(ProfileController())),
+      transition: Transition.rightToLeft,
+    ),
+
+    GetPage(
+      name: Routes.LOGIN_HISTORY,
+      page: () => LoginHistoryView(),
+      binding: BindingsBuilder(() => Get.put(ProfileController())),
       transition: Transition.rightToLeft,
     ),
   ];
