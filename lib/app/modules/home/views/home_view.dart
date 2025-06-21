@@ -6,8 +6,6 @@ import 'package:lottie/lottie.dart';
 import '../../../themes/app_colors.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
-import '../../../data/services/gula_service.dart';
-import '../../../data/services/air_service.dart';
 import '../../../modules/history/controllers/history_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -144,22 +142,35 @@ class HomeView extends GetView<HomeController> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Obx(() {
+                                            final total = controller
+                                                .totalGulaHariIni.value;
+                                            final target =
+                                                controller.targetGula.value;
+
                                             Color textColor;
-                                            if (controller
-                                                    .totalGulaHariIni.value <
-                                                25) {
-                                              textColor = const Color.fromARGB(
-                                                  255, 247, 135, 117);
-                                            } else if (controller
-                                                    .totalGulaHariIni.value <
-                                                50) {
-                                              textColor = Colors.orange;
+                                            if (target == 0) {
+                                              textColor = Colors.grey;
                                             } else {
-                                              textColor = const Color.fromARGB(
-                                                  255, 255, 30, 30);
+                                              final batas1 =
+                                                  (target / 3).floor();
+                                              final batas2 =
+                                                  (2 * target / 3).floor();
+
+                                              if (total < batas1) {
+                                                textColor =
+                                                    const Color.fromARGB(
+                                                        255, 247, 135, 117);
+                                              } else if (total < batas2) {
+                                                textColor = Colors.orange;
+                                              } else {
+                                                textColor =
+                                                    const Color.fromARGB(
+                                                        255, 255, 30, 30);
+                                              }
                                             }
+
                                             return Text(
-                                              "${controller.totalGulaHariIni.value} gram",
+                                              "$total gram",
                                               style: TextStyle(
                                                 fontSize: 22,
                                                 fontWeight: FontWeight.bold,
@@ -170,17 +181,61 @@ class HomeView extends GetView<HomeController> {
                                           Obx(() => Text(
                                                 "≈ ${controller.konversiKeSendokTeh()} sdt",
                                                 style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: AppColors
-                                                        .textSecondary),
+                                                  fontSize: 14,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
                                               )),
                                         ],
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () async {
-                                        await Get.toNamed(Routes.HISTORY,
-                                            arguments: {'openAddDialog': true});
+                                      onPressed: () {
+                                        final total =
+                                            controller.totalGulaHariIni.value;
+                                        final target =
+                                            controller.targetGula.value;
+                                        final selisih = target - total;
+
+                                        if (selisih <= 10 && selisih > 0) {
+                                          Get.defaultDialog(
+                                            title: "Hati-hati!",
+                                            middleText:
+                                                "Kamu akan mencapai batas konsumsi gula.\nKurang $selisih gram lagi akan menyentuh target.\nYakin ingin menambahkan?",
+                                            textConfirm: "Yakin",
+                                            textCancel: "Batal",
+                                            confirmTextColor: Colors.white,
+                                            onConfirm: () {
+                                              Get.back(); // tutup dialog
+                                              Get.toNamed(Routes.HISTORY,
+                                                  arguments: {
+                                                    'openAddDialog': true
+                                                  });
+                                            },
+                                          );
+                                        } else if (selisih <= 0) {
+                                          Get.defaultDialog(
+                                            title: "⚠️ Terlalu Banyak Gula!",
+                                            middleText:
+                                                "Kamu sudah melebihi batas konsumsi gula harian!\nTambahan konsumsi bisa berdampak buruk bagi kesehatan.\nYakin masih ingin menambahkan?",
+                                            textConfirm: "Tetap Tambah",
+                                            textCancel: "Batal",
+                                            confirmTextColor: Colors.white,
+                                            onConfirm: () {
+                                              Get.back();
+                                              Get.toNamed(Routes.HISTORY,
+                                                  arguments: {
+                                                    'openAddDialog': true
+                                                  });
+                                            },
+                                          );
+                                        } else {
+                                          // aman → langsung jalan
+                                          Get.toNamed(Routes.HISTORY,
+                                              arguments: {
+                                                'openAddDialog': true
+                                              });
+                                        }
                                         controller.ambilDataHariIni();
                                         controller.ambilRiwayat3Hari();
                                       },
@@ -192,28 +247,15 @@ class HomeView extends GetView<HomeController> {
                                 SizedBox(height: 10),
                                 Center(
                                   child: Obx(() {
-                                    String lottieAsset;
-                                    if (controller.totalGulaHariIni.value <
-                                        25) {
-                                      lottieAsset = 'assets/lottie/health.json';
-                                    } else if (controller
-                                            .totalGulaHariIni.value <
-                                        50) {
-                                      lottieAsset =
-                                          'assets/lottie/warning.json';
-                                    } else {
-                                      lottieAsset = 'assets/lottie/stop.json';
-                                    }
+                                    final asset = controller.lottieAsset;
                                     return Align(
-                                      alignment: controller
-                                          .getLottieAlignment(lottieAsset),
+                                      alignment:
+                                          controller.getLottieAlignment(asset),
                                       child: SizedBox(
-                                        height: controller
-                                            .getLottieSize(lottieAsset),
-                                        width: controller
-                                            .getLottieSize(lottieAsset),
+                                        height: controller.getLottieSize(asset),
+                                        width: controller.getLottieSize(asset),
                                         child: Lottie.asset(
-                                          lottieAsset,
+                                          asset,
                                           controller:
                                               controller.lottieController,
                                           fit: BoxFit.contain,
@@ -278,13 +320,13 @@ class HomeView extends GetView<HomeController> {
                                         ),
                                       )),
                                   SizedBox(height: 2),
-                                  Text(
-                                    "Target: 8 gelas/hari",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
+                                  Obx(() => Text(
+                                        "Target: ${controller.targetAir.value} gelas/hari",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      )),
                                   SizedBox(height: 2),
                                   Text(
                                     "Klik gelas untuk tambah",

@@ -98,7 +98,7 @@ class AppPages {
       name: _Paths.TARGET,
       page: () => TargetView(),
       binding: TargetBinding(),
-      transition: Transition.leftToRight,
+      transition: Transition.rightToLeft,
     ),
     GetPage(
       name: _Paths.BERITA,

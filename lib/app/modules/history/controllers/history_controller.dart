@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/history_item.dart';
 import '../../../data/services/gula_service.dart';
 import '../../../data/services/air_service.dart';

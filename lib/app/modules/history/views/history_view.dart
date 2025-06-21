@@ -6,7 +6,7 @@ import '../../../data/models/history_item.dart';
 import '../../../themes/app_colors.dart';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
 import 'package:scan_sek/app/utils/conversion_helper.dart';
-import 'package:scan_sek/app/routes/app_pages.dart';
+import '../../home/controllers/home_controller.dart';
 
 class HistoryView extends GetView<HistoryController> {
   @override
@@ -113,7 +113,42 @@ class HistoryView extends GetView<HistoryController> {
           return FloatingActionButton(
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.add),
-            onPressed: () => _showAddEditDialog(context),
+            onPressed: () {
+              final total = controller.totalGulaHariItu;
+              final homeCtrl = Get.find<HomeController>();
+              final target = homeCtrl.targetGula.value;
+              final selisih = target - total;
+
+              if (selisih <= 10 && selisih > 0) {
+                Get.defaultDialog(
+                  title: "Hati-hati!",
+                  middleText:
+                      "Kamu akan mencapai batas konsumsi gula.\nKurang $selisih gram lagi akan menyentuh target.\nYakin ingin menambahkan?",
+                  textConfirm: "Yakin",
+                  textCancel: "Batal",
+                  confirmTextColor: Colors.white,
+                  onConfirm: () {
+                    Get.back();
+                    _showAddEditDialog(context);
+                  },
+                );
+              } else if (selisih <= 0) {
+                Get.defaultDialog(
+                  title: "⚠️ Terlalu Banyak Gula!",
+                  middleText:
+                      "Kamu sudah melebihi batas konsumsi gula harian!\nTambahan konsumsi bisa berdampak buruk bagi kesehatan.\nYakin masih ingin menambahkan?",
+                  textConfirm: "Tetap Tambah",
+                  textCancel: "Batal",
+                  confirmTextColor: Colors.white,
+                  onConfirm: () {
+                    Get.back();
+                    _showAddEditDialog(context);
+                  },
+                );
+              } else {
+                _showAddEditDialog(context);
+              }
+            },
           );
         }
         return SizedBox.shrink();

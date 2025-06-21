@@ -10,6 +10,8 @@ class HomeController extends GetxController
     with WidgetsBindingObserver, GetTickerProviderStateMixin {
   var totalGulaHariIni = 0.obs;
   var totalGelasAir = 0.obs;
+  final targetGula = 50.obs;
+  final targetAir = 8.obs;
   var makananTerakhir = "(belum ada)".obs;
   var gulaMakananTerakhir = 0.obs;
   var waktuMakananTerakhir = "".obs;
@@ -56,6 +58,10 @@ class HomeController extends GetxController
     ambilNamaUser();
     ambilDataHariIni();
     ambilRiwayat3Hari();
+    ambilTarget();
+    everAll([totalGulaHariIni, targetGula], (_) {
+      updateLottieSpeed();
+    });
   }
 
   @override
@@ -69,7 +75,7 @@ class HomeController extends GetxController
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
     lottieController.dispose();
-    airLottieController.dispose(); // 🔥 tambahin ini
+    airLottieController.dispose();
     super.onClose();
   }
 
@@ -89,20 +95,38 @@ class HomeController extends GetxController
   }
 
   void updateLottieSpeed() {
-    if (totalGulaHariIni.value < 25) {
+    final total = totalGulaHariIni.value;
+    final target = targetGula.value;
+
+    if (target == 0) {
       lottieController.duration = const Duration(seconds: 2);
-    } else if (totalGulaHariIni.value < 50) {
-      lottieController.duration = const Duration(seconds: 200);
     } else {
-      lottieController.duration = const Duration(milliseconds: 700);
+      final batas1 = (target / 3).floor();
+      final batas2 = (2 * target / 3).floor();
+
+      if (total < batas1) {
+        lottieController.duration = const Duration(seconds: 2);
+      } else if (total < batas2) {
+        lottieController.duration = const Duration(seconds: 1);
+      } else {
+        lottieController.duration = const Duration(milliseconds: 800);
+      }
     }
+
     lottieController.repeat();
   }
 
   String get lottieAsset {
     final total = totalGulaHariIni.value;
-    if (total < 25) return 'assets/lottie/health.json';
-    if (total < 50) return 'assets/lottie/warning.json';
+    final target = targetGula.value;
+
+    if (target == 0) return 'assets/lottie/health.json';
+
+    final batas1 = (target / 3).floor();
+    final batas2 = (2 * target / 3).floor();
+
+    if (total < batas1) return 'assets/lottie/health.json';
+    if (total < batas2) return 'assets/lottie/warning.json';
     return 'assets/lottie/stop.json';
   }
 
@@ -110,20 +134,16 @@ class HomeController extends GetxController
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     try {
-      // Ambil data gula
       final resGula = await GulaService.ambilGula(tanggal: today);
       if (resGula.statusCode == 200 && resGula.data['success'] == true) {
         final List<dynamic> data = resGula.data['data'];
 
-        // 🔥 Bersihin data dari item yang nggak valid (misal waktuInput null)
         data.removeWhere((item) => item['waktuInput'] == null);
 
-        // 🔥 Hitung totalGula clean
         totalGulaHariIni.value = data.fold(
             0, (sum, item) => sum + (item['totalGula'] as num).toInt());
 
         if (data.isNotEmpty) {
-          // 🔥 Urutin data descending berdasarkan waktuInput biar yang terbaru di depan
           data.sort((a, b) => DateTime.parse(b['waktuInput'])
               .compareTo(DateTime.parse(a['waktuInput'])));
           final lastItem = data.first;
@@ -132,7 +152,6 @@ class HomeController extends GetxController
               lastItem['namaMakanan'] ?? "(tidak diketahui)";
           gulaMakananTerakhir.value = (lastItem['totalGula'] as num).toInt();
 
-          // 🔥 Ambil waktu input dengan aman
           final waktu = lastItem['waktuInput'];
           final dt = DateTime.tryParse(waktu);
           if (dt != null) {
@@ -142,7 +161,6 @@ class HomeController extends GetxController
             waktuMakananTerakhir.value = "(waktu tidak valid)";
           }
         } else {
-          // 🔥 Reset makanan terakhir kalau data kosong
           makananTerakhir.value = "(belum ada)";
           gulaMakananTerakhir.value = 0;
           waktuMakananTerakhir.value = "";
@@ -246,15 +264,21 @@ class HomeController extends GetxController
     }
   }
 
+  Future<void> ambilTarget() async {
+    final prefs = await SharedPreferences.getInstance();
+    targetGula.value = prefs.getInt('target_gula') ?? 50;
+    targetAir.value = prefs.getInt('target_air') ?? 8;
+  }
+
   void triggerFastAnimation(
       {AnimationController? controller, int? durationMs}) {
-    final usedController = controller ?? lottieController; // default ke gula
+    final usedController = controller ?? lottieController;
 
     usedController.stop();
     usedController.duration = Duration(seconds: 1, milliseconds: 300);
     usedController.reset();
     usedController.forward().then((_) {
-      usedController.duration = const Duration(seconds: 2); // default balik
+      usedController.duration = const Duration(seconds: 2);
       usedController.repeat();
     });
   }
