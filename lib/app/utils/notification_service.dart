@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/material.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -9,20 +11,21 @@ class NotificationService {
   static Future<void> init() async {
     print('🔧 Inisialisasi NotificationService...');
 
-    // Request permission untuk notifikasi
+    // Inisialisasi timezone (penting)
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+
     await _requestPermissions();
 
-    const AndroidInitializationSettings androidSettings =
+    const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings iosSettings =
-        DarwinInitializationSettings(
+    const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    const InitializationSettings initSettings = InitializationSettings(
+    const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
@@ -32,50 +35,33 @@ class NotificationService {
         initSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
-
-      print('📱 Plugin notifikasi berhasil diinisialisasi');
+      print('✅ Plugin notifikasi diinisialisasi');
     } catch (e) {
-      print('❌ Error inisialisasi plugin: $e');
+      print('❌ Error init plugin: $e');
     }
 
-    // Buat notification channels
     await _createNotificationChannels();
-
-    print('✅ NotificationService siap digunakan');
   }
 
   static Future<void> _requestPermissions() async {
-    print('🔐 Meminta permission notifikasi...');
-
-    // Request notification permission
-    PermissionStatus status = await Permission.notification.request();
+    final status = await Permission.notification.request();
     print('📢 Permission notifikasi: $status');
-
-    // Request exact alarm permission (Android 12+)
-    if (await Permission.scheduleExactAlarm.isDenied) {
-      PermissionStatus alarmStatus =
-          await Permission.scheduleExactAlarm.request();
-      print('⏰ Permission exact alarm: $alarmStatus');
-    }
-
-    // Request ignore battery optimization
-    if (await Permission.ignoreBatteryOptimizations.isDenied) {
-      PermissionStatus batteryStatus =
-          await Permission.ignoreBatteryOptimizations.request();
-      print('🔋 Permission battery optimization: $batteryStatus');
-    }
-  }
-
-  static Future<void> _createNotificationChannels() async {
-    print('📋 Membuat notification channels...');
 
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
-      // Channel untuk water reminder
-      const AndroidNotificationChannel waterChannel =
-          AndroidNotificationChannel(
+      final granted = await androidPlugin.requestNotificationsPermission();
+      print('📢 Android notification permission granted: $granted');
+    }
+  }
+
+  static Future<void> _createNotificationChannels() async {
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidPlugin != null) {
+      const waterChannel = AndroidNotificationChannel(
         'water_reminder_channel',
         'Pengingat Minum Air',
         description: 'Channel untuk alarm minum air secara berkala',
@@ -83,11 +69,11 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
         showBadge: true,
+        enableLights: true,
+        ledColor: Color(0xFF2196F3),
       );
 
-      // Channel untuk custom reminder
-      const AndroidNotificationChannel customChannel =
-          AndroidNotificationChannel(
+      const customChannel = AndroidNotificationChannel(
         'custom_reminder_channel',
         'Reminder Khusus',
         description: 'Channel untuk reminder jam tertentu',
@@ -95,26 +81,28 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
         showBadge: true,
+        enableLights: true,
+        ledColor: Color(0xFFFF9800),
       );
 
       try {
         await androidPlugin.createNotificationChannel(waterChannel);
         await androidPlugin.createNotificationChannel(customChannel);
-        print('✅ Notification channels berhasil dibuat');
+        print('✅ Notification channels dibuat');
       } catch (e) {
-        print('❌ Error membuat channels: $e');
+        print('❌ Error buat channel: $e');
       }
     }
   }
 
   static void _onNotificationTapped(NotificationResponse response) {
-    print('👆 Notifikasi diklik: ${response.id}');
-    // Bisa tambahkan navigasi atau aksi lain di sini
+    print(
+        '👆 Notifikasi diklik: ID ${response.id}, Payload: ${response.payload}');
+    // Tambahkan navigasi jika dibutuhkan
   }
 
   static Future<void> showNotification(String title, String body) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
+    const androidDetails = AndroidNotificationDetails(
       'water_reminder_channel',
       'Pengingat Minum Air',
       channelDescription: 'Channel untuk alarm minum air',
@@ -122,40 +110,67 @@ class NotificationService {
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
-      showWhen: true,
       icon: '@mipmap/ic_launcher',
     );
 
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-    );
+    const platformDetails = NotificationDetails(android: androidDetails);
 
     try {
       await _notifications.show(0, title, body, platformDetails);
-      print('📨 Notifikasi berhasil ditampilkan: $title');
+      print('📨 Notifikasi tampil: $title');
     } catch (e) {
-      print('❌ Error menampilkan notifikasi: $e');
+      print('❌ Error show notification: $e');
     }
   }
 
-  // Method untuk mengecek permission
+  static Future<void> scheduleIntervalReminder(int intervalMinutes) async {
+    final now = tz.TZDateTime.now(tz.local);
+
+    for (int i = 1; i <= 24; i++) {
+      final sched = now.add(Duration(minutes: intervalMinutes * i));
+
+      await _notifications.zonedSchedule(
+        1000 + i,
+        'Saatnya minum air 💧',
+        'Minum air biar tubuh sehat!',
+        sched,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'water_reminder_channel',
+            'Water Reminder',
+            channelDescription: 'Pengingat untuk minum air',
+            importance: Importance.max,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      print("✅ Scheduled reminder #$i at $sched");
+    }
+  }
+
+  static Future<void> debugPendingNotifications() async {
+    try {
+      final pending = await _notifications.pendingNotificationRequests();
+      print('📋 Total pending: ${pending.length}');
+      for (final notif in pending) {
+        print('   - ID: ${notif.id}, Title: ${notif.title}');
+      }
+    } catch (e) {
+      print('❌ Error debug notif: $e');
+    }
+  }
+
   static Future<bool> areNotificationsEnabled() async {
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-
-    if (androidPlugin != null) {
-      return await androidPlugin.areNotificationsEnabled() ?? false;
-    }
-    return false;
+    return await androidPlugin?.areNotificationsEnabled() ?? false;
   }
 
-  // Method untuk membuka settings notifikasi
   static Future<void> openNotificationSettings() async {
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-
-    if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
-    }
+    await androidPlugin?.requestNotificationsPermission();
   }
 }

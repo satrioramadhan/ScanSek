@@ -25,11 +25,16 @@ class TargetView extends GetView<TargetController> {
           foregroundColor: Colors.white,
           elevation: 2,
           actions: [
-            // Tombol test notifikasi
+             
             IconButton(
               onPressed: controller.testNotification,
               icon: Icon(Icons.notifications_active),
               tooltip: 'Test Notifikasi',
+            ),
+            IconButton(
+              onPressed: _showDebugInfo,
+              icon: Icon(Icons.bug_report),
+              tooltip: 'Debug Info',
             ),
           ],
         ),
@@ -65,8 +70,7 @@ class TargetView extends GetView<TargetController> {
                 );
               }),
               SizedBox(height: 20),
-
-              // Target Air
+ 
               Text("💧 Target Air Minum (gelas)",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Obx(() {
@@ -200,6 +204,43 @@ class TargetView extends GetView<TargetController> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+              ),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: controller.applyAllReminders,
+                      icon: Icon(Icons.refresh),
+                      label: Text("Refresh Reminder"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await controller.cancelAllReminders();
+                        Get.snackbar(
+                          "Reminder Dihapus",
+                          "Semua pengingat berhasil dibatalkan",
+                          backgroundColor: Colors.redAccent,
+                          colorText: Colors.white,
+                        );
+                      },
+                      icon: Icon(Icons.delete_forever),
+                      label: Text("Hapus Semua"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -345,6 +386,37 @@ class TargetView extends GetView<TargetController> {
           },
         );
       },
+    );
+  }
+
+  void _showDebugInfo() async {
+    // Debug pending notifications
+    await controller.debugPendingNotifications();
+    await NotificationService.debugPendingNotifications();
+
+    // Show info dialog
+    Get.dialog(
+      AlertDialog(
+        title: Text('Debug Info'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Notif Air: ${controller.notifAir.value}'),
+            Text('Interval Diatur: ${controller.intervalPernahDiatur.value}'),
+            Text('Interval: ${controller.intervalReminderHour.value} menit'),
+            Text('Custom Reminders: ${controller.reminderList.length}'),
+            SizedBox(height: 10),
+            Text('Cek console log untuk detail pending notifications'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 }

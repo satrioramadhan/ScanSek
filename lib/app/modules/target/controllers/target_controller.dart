@@ -4,12 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:scan_sek/app/utils/alarm_callbacks.dart';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 
 class TargetController extends GetxController {
-  // 🎯 State
   RxInt targetGula = 50.obs;
   RxInt targetAir = 8.obs;
   RxBool notifAir = false.obs;
@@ -22,19 +18,10 @@ class TargetController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initializeTimezone();
     _loadTargetDariPrefs();
     _loadReminderDariPrefs();
   }
 
-  // 🕐 Initialize timezone
-  void _initializeTimezone() {
-    tz.initializeTimeZones();
-    // Set timezone ke Jakarta (WIB)
-    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
-  }
-
-  // 🎯 Setters & Update ke SharedPreferences
   void setTargetGula(int value) async {
     targetGula.value = value;
     final prefs = await SharedPreferences.getInstance();
@@ -47,16 +34,24 @@ class TargetController extends GetxController {
     await prefs.setInt('target_air', value);
   }
 
-  void setIntervalReminderHour(int value) async {
-    intervalReminderHour.value = value.clamp(5, 720);
+  void setIntervalReminderHour(int valueInMinutes) async {
+    intervalReminderHour.value = valueInMinutes.clamp(5, 720);
     intervalPernahDiatur.value = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('interval_reminder_hour', intervalReminderHour.value);
     await prefs.setBool('interval_pernah_diatur', true);
 
-    // Restart reminder jika notifikasi aktif
+    print('🔧 Setting interval: ${intervalReminderHour.value} minutes');
+
     if (notifAir.value) {
       await _setupIntervalReminder();
+    }
+  }
+
+  Future<void> cancelAllReminders() async {
+    await _cancelIntervalReminder();
+    for (int i = 0; i < 20; i++) {
+      await _plugin.cancel(1000 + i);
     }
   }
 
@@ -65,6 +60,8 @@ class TargetController extends GetxController {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notif_air', value);
 
+    print('🔔 Toggle notif air: $value');
+
     if (value) {
       await _setupIntervalReminder();
     } else {
@@ -72,89 +69,86 @@ class TargetController extends GetxController {
     }
   }
 
-  // 🔔 Setup Interval Reminder menggunakan AndroidAlarmManager
   Future<void> _setupIntervalReminder() async {
+    print('⏰ Setting up interval reminders...');
     await _cancelIntervalReminder();
-    if (!notifAir.value) return;
 
-    print(
-        '🔔 Setting up interval reminder: ${intervalReminderHour.value} minutes');
+    if (!notifAir.value || !intervalPernahDiatur.value) return;
 
-    try {
-      // Gunakan AndroidAlarmManager untuk periodic alarm
-      final success = await AndroidAlarmManager.periodic(
-        Duration(minutes: intervalReminderHour.value),
-        999, // Alarm ID
-        fireIntervalReminder,
-        wakeup: true,
-        exact: true,
-        rescheduleOnReboot: true,
-      );
-
-      if (success) {
-        print('✅ Interval reminder berhasil diatur');
-
-        // Jadwalkan notifikasi pertama
-        await _scheduleFirstNotification();
-      } else {
-        print('❌ Gagal mengatur interval reminder');
-      }
-    } catch (e) {
-      print('❌ Error setting up interval reminder: $e');
-    }
-  }
-
-  // Schedule notifikasi pertama
-  Future<void> _scheduleFirstNotification() async {
-    final now = tz.TZDateTime.now(tz.local);
-    final firstNotification =
-        now.add(Duration(minutes: intervalReminderHour.value));
-
-    try {
-      await _plugin.zonedSchedule(
-        998, // ID berbeda untuk notifikasi pertama
-        'Waktunya Minum Air 💧',
-        'Ayo minum air untuk menjaga tubuh tetap segar!',
-        firstNotification,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'water_reminder_channel',
-            'Pengingat Minum Air',
-            channelDescription: 'Channel untuk alarm minum air',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            showWhen: true,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-      print('✅ First notification scheduled');
-    } catch (e) {
-      print('❌ Error scheduling first notification: $e');
-    }
+    final intervalMinutes = intervalReminderHour.value;
+    await scheduleIntervalNotification(
+      interval: Duration(minutes: intervalMinutes),
+      repeatCount: 24, // atau bisa disesuaikan jumlahnya
+    );
   }
 
   Future<void> _cancelIntervalReminder() async {
+    print('🗑️ Canceling interval reminders...');
     try {
-      await AndroidAlarmManager.cancel(999);
-      await _plugin.cancel(998); // Cancel first notification
-      print('✅ Interval reminder cancelled');
+      // Cancel interval notifications (ID 900-924)
+      for (int i = 1; i <= 24; i++) {
+        await _plugin.cancel(900 + i);
+      }
+      print('✅ Interval reminders canceled');
     } catch (e) {
-      print('❌ Error cancelling interval reminder: $e');
+      print('❌ Error canceling interval reminders: $e');
     }
   }
 
-  // ⏰ Reminder Khusus Manual
+  Future<void> scheduleIntervalNotification({
+    required Duration interval,
+    int repeatCount = 24,
+    int startId = 900,
+  }) async {
+    print(
+        '📆 Menjadwalkan ${repeatCount}x notifikasi tiap ${interval.inMinutes} menit');
+
+    final now = tz.TZDateTime.now(tz.local);
+    for (int i = 0; i < repeatCount; i++) {
+      final scheduledTime = now.add(interval * (i + 1));
+      try {
+        await _plugin.zonedSchedule(
+          startId + i,
+          'Waktunya Minum Air 💧',
+          'Minum air untuk jaga tubuh tetap sehat! (${i + 1}/$repeatCount)',
+          scheduledTime,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'water_reminder_channel',
+              'Pengingat Minum Air',
+              channelDescription: 'Channel untuk alarm minum air',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+        print('✅ Scheduled reminder ${i + 1} at $scheduledTime');
+      } catch (e) {
+        print('❌ Gagal menjadwalkan reminder ke-${i + 1}: $e');
+      }
+    }
+  }
+
   void pickReminderTime() async {
     TimeOfDay? picked = await showTimePicker(
       context: Get.context!,
       initialTime: TimeOfDay.now(),
     );
     if (picked != null) {
+      if (reminderList.any(
+          (time) => time.hour == picked.hour && time.minute == picked.minute)) {
+        Get.snackbar(
+          'Waktu Sudah Ada',
+          'Reminder untuk waktu ${formatTimeOfDay(picked)} sudah ada',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
       reminderList.add(picked);
       reminderList.sort((a, b) => a.hour != b.hour
           ? a.hour.compareTo(b.hour)
@@ -178,7 +172,6 @@ class TargetController extends GetxController {
     return DateFormat.Hm().format(dt);
   }
 
-  // 🗂️ Persistence (SharedPreferences)
   Future<void> _simpanReminderKePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final listStr = reminderList
@@ -194,14 +187,17 @@ class TargetController extends GetxController {
     targetAir.value = prefs.getInt('target_air') ?? 8;
     notifAir.value = prefs.getBool('notif_air') ?? false;
 
-    // ✅ cek apakah pernah diatur manual
     if (prefs.containsKey('interval_reminder_hour')) {
       intervalReminderHour.value = prefs.getInt('interval_reminder_hour')!;
       intervalPernahDiatur.value =
           prefs.getBool('interval_pernah_diatur') ?? false;
     }
 
-    // Auto start reminder jika sudah aktif sebelumnya
+    print('📂 Loaded preferences:');
+    print('   - notifAir: ${notifAir.value}');
+    print('   - intervalPernahDiatur: ${intervalPernahDiatur.value}');
+    print('   - intervalReminderHour: ${intervalReminderHour.value}');
+
     if (notifAir.value && intervalPernahDiatur.value) {
       await _setupIntervalReminder();
     }
@@ -218,95 +214,80 @@ class TargetController extends GetxController {
     }).toList();
     reminderList.assignAll(listTime);
 
-    // Jadwalkan reminder khusus jika ada
+    print('📂 Loaded ${reminderList.length} custom reminders');
+
     if (reminderList.isNotEmpty) {
       await _jadwalkanReminderKhusus();
     }
   }
 
   Future<void> _jadwalkanReminderKhusus() async {
-    print('📅 Menjadwalkan ${reminderList.length} reminder khusus');
+    print('⏰ Scheduling custom reminders...');
 
-    // Cancel semua notifikasi reminder khusus dulu
+    // Cancel existing custom reminders (ID 1000-1019)
     for (int i = 0; i < 20; i++) {
       await _plugin.cancel(1000 + i);
-      await AndroidAlarmManager.cancel(1000 + i); // Cancel alarm juga
     }
 
-    for (int i = 0; i < reminderList.length; i++) {
-      final time = reminderList[i];
-      final now = tz.TZDateTime.now(tz.local);
+    try {
+      for (int i = 0; i < reminderList.length; i++) {
+        final time = reminderList[i];
 
-      // Buat scheduled time untuk hari ini
-      var scheduled = tz.TZDateTime(
-        tz.local,
-        now.year,
-        now.month,
-        now.day,
-        time.hour,
-        time.minute,
-      );
-
-      // Jika waktu sudah lewat hari ini, jadwalkan untuk besok
-      if (scheduled.isBefore(now)) {
-        scheduled = scheduled.add(Duration(days: 1));
-      }
-
-      print('⏰ Reminder ${i + 1}: ${formatTimeOfDay(time)} -> $scheduled');
-
-      try {
-        final alarmTime = scheduled.millisecondsSinceEpoch;
-        final success = await AndroidAlarmManager.oneShotAt(
-          DateTime.fromMillisecondsSinceEpoch(alarmTime),
-          1000 + i,
-          fireCustomReminder,
-          wakeup: true,
-          exact: true,
-          rescheduleOnReboot: true,
+        final now = tz.TZDateTime.now(tz.local);
+        var scheduled = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          time.hour,
+          time.minute,
         );
 
-        if (success) {
-          print(
-              '✅ Custom reminder ${i + 1} berhasil dijadwalkan dengan AndroidAlarmManager');
-
-          await _plugin.zonedSchedule(
-            1000 + i,
-            'Reminder Khusus 🕒',
-            'Sudah saatnya kamu minum air sesuai jadwal.',
-            scheduled,
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                'custom_reminder_channel',
-                'Reminder Khusus',
-                channelDescription: 'Channel untuk reminder jam tertentu',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                showWhen: true,
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
-          );
+        // Jika waktu sudah terlewat hari ini, jadwalkan untuk besok
+        if (scheduled.isBefore(now)) {
+          scheduled = scheduled.add(Duration(days: 1));
         }
-      } catch (e) {
-        print('❌ Error scheduling custom reminder ${i + 1}: $e');
+
+        await _plugin.zonedSchedule(
+          1000 + i,
+          'Reminder Khusus 🕒',
+          'Sudah saatnya kamu minum air sesuai jadwal: ${formatTimeOfDay(time)}',
+          scheduled,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'custom_reminder_channel', // ✅ Fixed channel ID
+              'Reminder Khusus',
+              channelDescription: 'Channel untuk reminder jam tertentu',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+
+        print(
+            '📋 Scheduled custom reminder ${i + 1}: ${formatTimeOfDay(time)} at $scheduled');
       }
+
+      print('✅ Successfully scheduled ${reminderList.length} custom reminders');
+    } catch (e) {
+      print('❌ Error scheduling custom reminders: $e');
     }
   }
 
   Future<void> testNotification() async {
+    print('🧪 Testing notification...');
     try {
       await _plugin.show(
         9999,
         'Test Notifikasi 🧪',
-        'Jika kamu melihat ini, notifikasi bekerja dengan baik!',
+        'Jika kamu melihat ini, notifikasi bekerja dengan baik! ${DateTime.now().toString().substring(11, 19)}',
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'water_reminder_channel',
+            'water_reminder_channel', // ✅ Fixed channel ID
             'Pengingat Minum Air',
             channelDescription: 'Channel untuk alarm minum air',
             importance: Importance.max,
@@ -316,46 +297,54 @@ class TargetController extends GetxController {
           ),
         ),
       );
+      print('✅ Test notification sent');
+    } catch (e) {
+      print('❌ Error sending test notification: $e');
+    }
+  }
+
+  Future<void> applyAllReminders() async {
+    print('🔄 Applying all reminders...');
+
+    try {
+      if (notifAir.value && intervalPernahDiatur.value) {
+        await _setupIntervalReminder();
+        print('✅ Interval reminders applied');
+      }
+
+      if (reminderList.isNotEmpty) {
+        await _jadwalkanReminderKhusus();
+        print('✅ Custom reminders applied');
+      }
 
       Get.snackbar(
-        'Test Berhasil',
-        'Notifikasi test telah dikirim!',
+        'Berhasil',
+        'Semua pengingat telah diterapkan!',
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
     } catch (e) {
+      print('❌ Error applying reminders: $e');
       Get.snackbar(
-        'Test Gagal',
-        'Error: $e',
+        'Error',
+        'Gagal menerapkan pengingat: $e',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
     }
   }
 
-  Future<void> applyAllReminders() async {
+  // Method untuk debug - lihat pending notifications
+  Future<void> debugPendingNotifications() async {
     try {
-      if (notifAir.value && intervalPernahDiatur.value) {
-        await _setupIntervalReminder();
+      final pendingNotifications = await _plugin.pendingNotificationRequests();
+      print('📋 Pending notifications (${pendingNotifications.length}):');
+      for (final notif in pendingNotifications) {
+        print(
+            '   - ID: ${notif.id}, Title: ${notif.title}, Body: ${notif.body}');
       }
-
-      if (reminderList.isNotEmpty) {
-        await _jadwalkanReminderKhusus();
-      }
-
-      Get.snackbar(
-        'Pengaturan Diterapkan',
-        'Semua reminder telah diperbarui!',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Gagal menerapkan pengaturan: $e',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      print('❌ Error getting pending notifications: $e');
     }
   }
 }
