@@ -25,7 +25,6 @@ Future<void> initializeBackgroundService() async {
 void onStart(ServiceInstance service) {
   DartPluginRegistrant.ensureInitialized();
 
-  // Jadwalkan pengingat ulang setiap hari jam 00:00
   final now = tz.TZDateTime.now(tz.local);
   final nextMidnight =
       tz.TZDateTime(tz.local, now.year, now.month, now.day + 1);
@@ -34,8 +33,7 @@ void onStart(ServiceInstance service) {
   print('🔁 Reminder akan di-refresh pada $nextMidnight');
 
   Future.delayed(delay, () async {
-    await NotificationService.scheduleIntervalReminder(// default 2 jam
-        120); // Kamu bisa ambil nilai dari SharedPreferences kalau mau lebih dinamis
+    await NotificationService.scheduleIntervalReminder(120);
     print("🔁 Reminder interval dijadwalkan ulang jam 00:00");
   });
 }

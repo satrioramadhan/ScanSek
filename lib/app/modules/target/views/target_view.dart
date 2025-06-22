@@ -5,6 +5,7 @@ import '../../../themes/app_colors.dart';
 import '../controllers/target_controller.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../../utils/notification_service.dart';
+import 'package:scan_sek/app/data/models/custom_reminder_model.dart';
 
 class TargetView extends GetView<TargetController> {
   @override
@@ -25,7 +26,6 @@ class TargetView extends GetView<TargetController> {
           foregroundColor: Colors.white,
           elevation: 2,
           actions: [
-             
             IconButton(
               onPressed: controller.testNotification,
               icon: Icon(Icons.notifications_active),
@@ -70,7 +70,7 @@ class TargetView extends GetView<TargetController> {
                 );
               }),
               SizedBox(height: 20),
- 
+
               Text("💧 Target Air Minum (gelas)",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               Obx(() {
@@ -165,7 +165,7 @@ class TargetView extends GetView<TargetController> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               SizedBox(height: 10),
               ElevatedButton.icon(
-                onPressed: controller.pickReminderTime,
+                onPressed: () => controller.pickReminderTime(),
                 icon: Icon(Icons.add_alarm),
                 label: Text("Tambah Reminder"),
                 style: ElevatedButton.styleFrom(
@@ -175,15 +175,21 @@ class TargetView extends GetView<TargetController> {
               ),
               SizedBox(height: 10),
               Obx(() => Column(
-                    children: controller.reminderList.map((time) {
+                    children: controller.reminderList.map((reminder) {
                       return Card(
                         child: ListTile(
                           leading: Icon(Icons.alarm, color: AppColors.primary),
-                          title: Text(controller.formatTimeOfDay(time)),
-                          subtitle: Text("Reminder harian"),
+                          title: Text(reminder.title),
+                          subtitle: Text(
+                            "${controller.formatTimeOfDay(reminder.time)} • ${reminder.body}",
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                          onTap: () =>
+                              controller.pickReminderTime(existing: reminder),
                           trailing: IconButton(
                             icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => controller.removeReminder(time),
+                            onPressed: () =>
+                                controller.removeReminder(reminder),
                           ),
                         ),
                       );

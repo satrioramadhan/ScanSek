@@ -2,14 +2,16 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:scan_sek/app/data/models/custom_reminder_model.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class TargetController extends GetxController {
   RxInt targetGula = 50.obs;
   RxInt targetAir = 8.obs;
   RxBool notifAir = false.obs;
-  RxList<TimeOfDay> reminderList = <TimeOfDay>[].obs;
+  RxList<CustomReminder> reminderList = <CustomReminder>[].obs;
   RxInt intervalReminderHour = 2.obs;
   RxBool intervalPernahDiatur = false.obs;
 
@@ -132,39 +134,98 @@ class TargetController extends GetxController {
     }
   }
 
-  void pickReminderTime() async {
-    TimeOfDay? picked = await showTimePicker(
-      context: Get.context!,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      if (reminderList.any(
-          (time) => time.hour == picked.hour && time.minute == picked.minute)) {
-        Get.snackbar(
-          'Waktu Sudah Ada',
-          'Reminder untuk waktu ${formatTimeOfDay(picked)} sudah ada',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
-        return;
-      }
+  void pickReminderTime({CustomReminder? existing}) async {
+    final context = Get.context!;
+    final isEdit = existing != null;
 
-      reminderList.add(picked);
-      reminderList.sort((a, b) => a.hour != b.hour
-          ? a.hour.compareTo(b.hour)
-          : a.minute.compareTo(b.minute));
-      await _simpanReminderKePrefs();
-      await _jadwalkanReminderKhusus();
-    }
+    TimeOfDay time = existing?.time ?? TimeOfDay.now();
+    final titleCtrl = TextEditingController(text: existing?.title ?? '');
+    final bodyCtrl = TextEditingController(text: existing?.body ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(isEdit ? 'Edit Reminder' : 'Tambah Reminder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: InputDecoration(labelText: 'Judul Notifikasi'),
+            ),
+            TextField(
+              controller: bodyCtrl,
+              decoration: InputDecoration(labelText: 'Isi Notifikasi'),
+            ),
+            SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: time,
+                );
+                if (picked != null) {
+                  time = picked;
+                }
+              },
+              icon: Icon(Icons.access_time),
+              label: Text("Pilih Jam"),
+            )
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: Text("Batal")),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty ||
+                  bodyCtrl.text.trim().isEmpty) {
+                Get.snackbar('Error', 'Judul dan isi tidak boleh kosong',
+                    backgroundColor: Colors.red, colorText: Colors.white);
+                return;
+              }
+
+              final reminder = CustomReminder(
+                time: time,
+                title: titleCtrl.text.trim(),
+                body: bodyCtrl.text.trim(),
+              );
+
+              if (isEdit) {
+                final index = reminderList.indexOf(existing!);
+                reminderList[index] = reminder;
+              } else {
+                // Cegah duplikat waktu
+                final already = reminderList.any((e) =>
+                    e.time.hour == time.hour && e.time.minute == time.minute);
+                if (already) {
+                  Get.snackbar('Gagal', 'Waktu sudah ada',
+                      backgroundColor: Colors.orange, colorText: Colors.white);
+                  return;
+                }
+                reminderList.add(reminder);
+              }
+
+              // Sort dan simpan
+              reminderList.sort((a, b) => a.time.hour != b.time.hour
+                  ? a.time.hour.compareTo(b.time.hour)
+                  : a.time.minute.compareTo(b.time.minute));
+
+              await _simpanReminderKePrefs();
+              await _jadwalkanReminderKhusus();
+
+              Get.back();
+            },
+            child: Text("Simpan"),
+          )
+        ],
+      ),
+    );
   }
 
-  void removeReminder(TimeOfDay time) async {
-    final index = reminderList.indexOf(time);
-    if (index >= 0) {
-      reminderList.removeAt(index);
-      await _simpanReminderKePrefs();
-      await _jadwalkanReminderKhusus();
-    }
+  void removeReminder(CustomReminder reminder) async {
+    reminderList.remove(reminder);
+    await _simpanReminderKePrefs();
+    await _jadwalkanReminderKhusus();
   }
 
   String formatTimeOfDay(TimeOfDay tod) {
@@ -174,10 +235,7 @@ class TargetController extends GetxController {
 
   Future<void> _simpanReminderKePrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final listStr = reminderList
-        .map((e) =>
-            "${e.hour.toString().padLeft(2, '0')}:${e.minute.toString().padLeft(2, '0')}")
-        .toList();
+    final listStr = reminderList.map((e) => jsonEncode(e.toMap())).toList();
     await prefs.setStringList('reminder_list', listStr);
   }
 
@@ -206,15 +264,26 @@ class TargetController extends GetxController {
   Future<void> _loadReminderDariPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final listStr = prefs.getStringList('reminder_list') ?? [];
-    final listTime = listStr.map((str) {
-      final parts = str.split(":");
-      final hour = int.tryParse(parts[0]) ?? 0;
-      final minute = int.tryParse(parts[1]) ?? 0;
-      return TimeOfDay(hour: hour, minute: minute);
-    }).toList();
-    reminderList.assignAll(listTime);
 
-    print('📂 Loaded ${reminderList.length} custom reminders');
+    print("🧠 Raw reminder data from prefs: $listStr");
+
+    final listReminder = listStr
+        .map((str) {
+          try {
+            final map = jsonDecode(str);
+            print('✅ Parsed reminder: $map');
+            return CustomReminder.fromMap(map);
+          } catch (e) {
+            print('❌ Gagal decode reminder: $e\nData: $str');
+            return null;
+          }
+        })
+        .whereType<CustomReminder>()
+        .toList();
+
+    reminderList.assignAll(listReminder);
+
+    print('📂 Loaded ${reminderList.length} custom reminders dari prefs');
 
     if (reminderList.isNotEmpty) {
       await _jadwalkanReminderKhusus();
@@ -231,7 +300,8 @@ class TargetController extends GetxController {
 
     try {
       for (int i = 0; i < reminderList.length; i++) {
-        final time = reminderList[i];
+        final reminder = reminderList[i];
+        final time = reminder.time;
 
         final now = tz.TZDateTime.now(tz.local);
         var scheduled = tz.TZDateTime(
@@ -250,8 +320,8 @@ class TargetController extends GetxController {
 
         await _plugin.zonedSchedule(
           1000 + i,
-          'Reminder Khusus 🕒',
-          'Sudah saatnya kamu minum air sesuai jadwal: ${formatTimeOfDay(time)}',
+          reminder.title,
+          reminder.body,
           scheduled,
           const NotificationDetails(
             android: AndroidNotificationDetails(
@@ -269,7 +339,7 @@ class TargetController extends GetxController {
         );
 
         print(
-            '📋 Scheduled custom reminder ${i + 1}: ${formatTimeOfDay(time)} at $scheduled');
+            '📋 Scheduled custom reminder ${i + 1}: ${reminder.title} at $scheduled');
       }
 
       print('✅ Successfully scheduled ${reminderList.length} custom reminders');
