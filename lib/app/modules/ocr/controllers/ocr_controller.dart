@@ -1,3 +1,5 @@
+// ocr_controller.dart dengan mode switch yang lebih clean
+
 import 'dart:async';
 import 'dart:io';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
@@ -7,24 +9,25 @@ import 'package:get/get.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
 
+enum OcrMode { capture, fotoLabel }
+
 class OcrController extends GetxController {
-  // Konstanta untuk deteksi
-  static const double TOLERANSI_GARIS_BANTU = 10.0; // Diperbesar dari 25
-  static const double TOLERANSI_BARIS_SAMA = 40.0; // Diperbesar dari 100
-  static const double JARAK_MINIMUM_KANAN = 15.0; // Diperkecil dari 40
+  static const double TOLERANSI_BARIS_SAMA = 40.0;
+  static const double JARAK_MINIMUM_KANAN = 15.0;
   static const double GRAM_MINIMUM = 0.5;
-  static const double GRAM_MAKSIMUM = 50.0; // Diperkecil dari 100
+  static const double GRAM_MAKSIMUM = 50.0;
 
   late CameraController cameraController;
   var isCameraInitialized = false.obs;
   var recognizedText = ''.obs;
   var currentTeaspoonText = ''.obs;
   var sugarGram = 0.0.obs;
-  var guideRect = Rect.zero.obs;
-  var isCustomRectActive = false.obs;
-
+  var isCapturing = false.obs;
   var previewSize = Size.zero;
-  int previousGram = 0;
+
+  var currentMode = OcrMode.capture.obs;
+  var capturedImage = Rx<File?>(null);
+  var isPhotoMode = false.obs; // ✅ Tambahan untuk switch mode foto
 
   double get sugarTeaspoon => sugarGram.value / 4.0;
 
@@ -34,13 +37,11 @@ class OcrController extends GetxController {
   var highlightRects = <Rect>[].obs;
   var spoonImages = <String>[].obs;
 
-  // Regexuntuk gula
   final sugarRegex = RegExp(
     r'\b(gula(\s*total)?|sugar|sugars|gula/sugars)\b',
     caseSensitive: false,
   );
 
-  // Regex untuk gram
   final gramRegex = RegExp(
     r'(\d+(?:[.,]\d+)?)\s*(?:g|gram|grams?)\b',
     caseSensitive: false,
@@ -59,6 +60,33 @@ class OcrController extends GetxController {
     super.onClose();
   }
 
+  // ✅ Method untuk toggle mode
+  void togglePhotoMode() {
+    isPhotoMode.value = !isPhotoMode.value;
+    resetDetection(); // Reset deteksi saat ganti mode
+  }
+
+  // ✅ Method untuk handle button utama (Deteksi/Ambil Foto Label)
+  Future<void> handleMainButton() async {
+    if (isPhotoMode.value) {
+      await captureAndShowResult();
+    } else {
+      await captureImage();
+    }
+  }
+
+  // ✅ Method untuk get text button berdasarkan mode
+  String getMainButtonText() {
+    if (isCapturing.value) return "Memproses...";
+    return isPhotoMode.value ? "Ambil Foto Label" : "Deteksi";
+  }
+
+  // ✅ Method untuk get icon button berdasarkan mode
+  IconData getMainButtonIcon() {
+    if (isCapturing.value) return Icons.hourglass_empty;
+    return isPhotoMode.value ? Icons.image_search : Icons.search;
+  }
+
   Future<void> initCamera() async {
     try {
       final cameras = await availableCameras();
@@ -75,10 +103,49 @@ class OcrController extends GetxController {
     }
   }
 
-  Future<void> triggerDetection({
-    bool fromGuide = false,
-    bool fromCustomRect = false,
-  }) async {
+  Future<void> captureImage() async {
+    if (!cameraController.value.isInitialized || isCapturing.value) return;
+
+    isCapturing.value = true;
+    try {
+      await triggerDetection();
+    } finally {
+      isCapturing.value = false;
+    }
+  }
+
+  Future<void> captureAndShowResult() async {
+    if (!cameraController.value.isInitialized || isCapturing.value) return;
+
+    isCapturing.value = true;
+    try {
+      final XFile file = await cameraController.takePicture();
+      capturedImage.value = File(file.path);
+
+      final inputImage = InputImage.fromFilePath(file.path);
+      final result = await textRecognizer.processImage(inputImage);
+
+      final bytes = await File(file.path).readAsBytes();
+      final decodedImage = img.decodeImage(bytes);
+
+      if (decodedImage != null) {
+        previewSize = Size(
+          decodedImage.width.toDouble(),
+          decodedImage.height.toDouble(),
+        );
+        await _extractSugarAutomatic(result.blocks, previewSize);
+        recognizedText.value = result.text;
+        currentMode.value = OcrMode.fotoLabel;
+      }
+    } catch (e) {
+      print("❌ Error OCR fotoLabel: $e");
+      _showErrorSnackbar("Gagal memproses gambar");
+    } finally {
+      isCapturing.value = false;
+    }
+  }
+
+  Future<void> triggerDetection() async {
     if (!cameraController.value.isInitialized || isDetecting) return;
 
     isDetecting = true;
@@ -95,13 +162,7 @@ class OcrController extends GetxController {
           cameraController.value.previewSize!.height,
           cameraController.value.previewSize!.width,
         );
-
-        if (fromCustomRect) {
-          await _extractSugarFromCustomRect(
-              result.blocks, guideRect.value, previewSize);
-        } else {
-          await _extractSugarAutomatic(result.blocks, previewSize);
-        }
+        await _extractSugarAutomatic(result.blocks, previewSize);
       }
 
       recognizedText.value = result.text;
@@ -115,62 +176,21 @@ class OcrController extends GetxController {
 
   Future<void> _extractSugarAutomatic(
       List<TextBlock> blocks, Size originalImageSize) async {
-    _resetDetection();
+    resetDetection();
 
     final screenSize = Get.size;
     final transformData =
         _calculateTransformation(originalImageSize, screenSize);
     final allLines = _extractAllLines(blocks);
 
-    // Strategi 1: Cari kata "gula" dan angka dalam baris yang sama
     if (await _findSugarInSameLine(allLines, transformData)) return;
-
-    // Strategi 2: Cari kata "gula" dan angka di baris berikutnya
     if (await _findSugarInNextLine(allLines, transformData)) return;
-
-    // Strategi 3: Cari kata "gula" dan angka terdekat di sebelah kanan
     if (await _findSugarNearby(allLines, transformData)) return;
-
-    // Fallback terakhir: cari angka gram yang valid walau tanpa kata gula
     if (await _fallbackFindAnyGram(allLines, transformData)) return;
-    _showErrorSnackbar("Gula tidak terdeteksi, gunakan garis bantu");
+    _showErrorSnackbar("Gula tidak terdeteksi");
   }
 
-  Future<void> _extractSugarFromCustomRect(
-      List<TextBlock> blocks, Rect customRect, Size originalImageSize) async {
-    _resetDetection();
-
-    final screenSize = Get.size;
-    final transformData =
-        _calculateTransformation(originalImageSize, screenSize);
-
-    final imageRect = Rect.fromLTWH(
-      customRect.left / transformData['scale']!,
-      customRect.top / transformData['scale']!,
-      customRect.width / transformData['scale']!,
-      customRect.height / transformData['scale']!,
-    );
-
-    final allLines = _extractAllLines(blocks);
-    final linesInRect = allLines.where((line) {
-      final intersect = imageRect.intersect(line.boundingBox);
-      final intersectArea = intersect.width * intersect.height;
-      final lineArea = line.boundingBox.width * line.boundingBox.height;
-
-      // 60% area masuk + center wajib dalam bingkai
-      return intersectArea / lineArea >= 0.5 &&
-          imageRect.contains(line.boundingBox.center);
-    }).toList();
-
-    if (await _findSugarInSameLine(linesInRect, transformData)) return;
-    if (await _findSugarNearby(linesInRect, transformData)) return;
-
-    _showErrorSnackbar("Gagal deteksi dalam area khusus");
-  }
-
-  // === UTILITY METHODS ===
-
-  void _resetDetection() {
+  void resetDetection() {
     highlightRects.clear();
     spoonImages.clear();
     sugarGram.value = 0.0;
@@ -264,7 +284,6 @@ class OcrController extends GetxController {
             final yDiff = (sugarY - gramY).abs();
             final xDiff = gramX - sugarX;
 
-            // Cek apakah dalam baris yang sama dan di sebelah kanan
             if (yDiff < TOLERANSI_BARIS_SAMA && xDiff > JARAK_MINIMUM_KANAN) {
               final value =
                   double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
@@ -305,7 +324,6 @@ class OcrController extends GetxController {
       Map<String, double> transformData) async {
     sugarGram.value = value;
 
-    // Highlight semua line yang terkait
     for (final line in lines) {
       highlightRects.add(_transformRect(line.boundingBox,
           transformData['scale']!, transformData['dx']!, transformData['dy']!));
@@ -313,7 +331,6 @@ class OcrController extends GetxController {
 
     _generateSpoons(value);
 
-    // Tampilkan notifikasi sukses
     SnackbarHelper.show(
       "Gula Terdeteksi",
       "${value.toStringAsFixed(1)}g = ${(value / 4).toStringAsFixed(1)} sdt",
@@ -322,7 +339,7 @@ class OcrController extends GetxController {
   }
 
   Rect _transformRect(Rect rect, double scale, double dx, double dy) {
-    const offsetY = 5.0; // Naikkan highlight sedikit
+    const offsetY = 5.0;
     return Rect.fromLTWH(
       rect.left * scale - dx,
       rect.top * scale - dy - offsetY,
@@ -354,7 +371,6 @@ class OcrController extends GetxController {
       seper4Count += 1;
     }
 
-    // Tambahkan gambar sendok
     for (int i = 0; i < fullCount; i++) {
       spoonImages.add('assets/images/full_sdt.png');
     }
