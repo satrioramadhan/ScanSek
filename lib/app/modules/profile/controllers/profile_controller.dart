@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
+import 'package:dio/dio.dart' as dio;
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:scan_sek/app/data/services/api_service.dart';
 import 'package:scan_sek/app/routes/app_pages.dart';
+import 'package:scan_sek/app/utils/snackbar_helper.dart'; // 🔥 Import SnackbarHelper
 
 class ProfileController extends GetxController {
   var username = ''.obs;
@@ -11,10 +14,15 @@ class ProfileController extends GetxController {
   var newUsername = ''.obs;
   var newEmail = ''.obs;
   var newPassword = ''.obs;
+  var confirmPassword = ''.obs;
   var currentPassword = ''.obs;
-  var showCurrentPasswordField = false.obs;
+  var showPasswordFields = false.obs;
   var obscureNewPassword = true.obs;
+  var obscureConfirmPassword = true.obs;
   var obscureCurrentPassword = true.obs;
+  var hasExistingPassword = false.obs;
+  var isCreatingPassword = false.obs;
+  var isSavingChanges = false.obs;
   final loginHistory = <Map<String, dynamic>>[].obs;
 
   @override
@@ -25,64 +33,238 @@ class ProfileController extends GetxController {
 
   Future<void> fetchUserInfo() async {
     try {
+      isLoading.value = true;
       final res = await ApiService.dioClient.get('/auth/user/info');
+
       if (res.statusCode == 200 && res.data['success'] == true) {
         final data = res.data['data'];
         username.value = data['username'] ?? 'Tidak Diketahui';
         email.value = data['email'] ?? 'Tidak Diketahui';
         reminder.value = data['reminder'] ?? '';
-
-        // Default buat edit form
+        hasExistingPassword.value = data['has_password'] ?? false;
         newUsername.value = username.value;
         newEmail.value = email.value;
-      } else {
-        Get.snackbar('Error', res.data['message'] ?? 'Gagal ambil data profil');
+        _resetPasswordFields();
       }
     } catch (e) {
-      Get.snackbar('Error', e.toString());
+      // error handling...
     } finally {
       isLoading.value = false;
     }
   }
 
-  void checkPasswordField(String val) {
-    newPassword.value = val;
-    showCurrentPasswordField.value = val.isNotEmpty;
+  // 🔥 Dipanggil saat user ngetik di field password
+  void onPasswordChanged(String value) {
+    newPassword.value = value;
+
+    // Show additional fields only if user is typing password
+    showPasswordFields.value = value.isNotEmpty;
   }
 
-  Future<void> saveChanges() async {
-    try {
-      final updates = {};
-      if (newUsername.value.isNotEmpty) updates['username'] = newUsername.value;
-      if (newEmail.value.isNotEmpty) updates['email'] = newEmail.value;
-      if (newPassword.value.isNotEmpty) {
-        if (currentPassword.value.isEmpty) {
-          Get.snackbar('Error', 'Harap masukkan password saat ini');
-          return;
-        }
-        updates['password'] = {
-          'new': newPassword.value,
-          'current': currentPassword.value,
-        };
-      }
+  void _resetPasswordFields() {
+    newPassword.value = '';
+    confirmPassword.value = '';
+    currentPassword.value = '';
+    showPasswordFields.value = false;
+    obscureNewPassword.value = true;
+    obscureConfirmPassword.value = true;
+    obscureCurrentPassword.value = true;
+  }
 
-      if (updates.isEmpty) {
-        Get.snackbar('Info', 'Tidak ada perubahan');
+  bool _validatePasswordFields() {
+    if (newPassword.value.isEmpty) {
+      SnackbarHelper.show(
+        'Error',
+        'Password baru tidak boleh kosong',
+        type: 'error',
+      );
+      return false;
+    }
+
+    if (confirmPassword.value.isEmpty) {
+      SnackbarHelper.show(
+        'Error',
+        'Konfirmasi password tidak boleh kosong',
+        type: 'error',
+      );
+      return false;
+    }
+
+    if (newPassword.value != confirmPassword.value) {
+      SnackbarHelper.show(
+        'Error',
+        'Password dan konfirmasi password tidak cocok',
+        type: 'error',
+      );
+      return false;
+    }
+
+    // Validasi password strength
+    if (newPassword.value.length < 6) {
+      SnackbarHelper.show(
+        'Error',
+        'Password minimal 6 karakter',
+        type: 'error',
+      );
+      return false;
+    }
+
+    // Jika user sudah punya password, wajib isi password saat ini
+    if (hasExistingPassword.value && currentPassword.value.isEmpty) {
+      SnackbarHelper.show(
+        'Error',
+        'Password saat ini wajib diisi',
+        type: 'error',
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  // 🔥 Check if there are any changes made
+  bool _hasChanges() {
+    // Check username changes
+    bool usernameChanged =
+        newUsername.value.isNotEmpty && newUsername.value != username.value;
+
+    // Check email changes (although email field is locked, we still check for completeness)
+    bool emailChanged =
+        newEmail.value.isNotEmpty && newEmail.value != email.value;
+
+    // Check password changes
+    bool passwordChanged = newPassword.value.isNotEmpty;
+
+    return usernameChanged || emailChanged || passwordChanged;
+  }
+
+  Future<void> saveProfile() async {
+    try {
+      if (!_hasChanges()) {
+        SnackbarHelper.show(
+          'Info',
+          'Tidak ada perubahan yang dilakukan',
+          type: 'info',
+        );
         return;
       }
 
-      final res =
-          await ApiService.dioClient.put('/auth/update-profile', data: updates);
-      if (res.statusCode == 200 && res.data['success'] == true) {
-        Get.snackbar('Sukses', 'Profil diperbarui');
-        fetchUserInfo();
-        Get.back();
+      final isPasswordAction = newPassword.value.isNotEmpty;
+
+      if (isPasswordAction) {
+        if (!_validatePasswordFields()) return;
+
+        if (hasExistingPassword.value) {
+          isSavingChanges.value = true;
+        } else {
+          isCreatingPassword.value = true;
+        }
       } else {
-        Get.snackbar('Gagal', res.data['message'] ?? 'Update gagal');
+        isSavingChanges.value = true;
+      }
+
+      final updates = {};
+
+      if (newUsername.value.isNotEmpty && newUsername.value != username.value) {
+        updates['username'] = newUsername.value;
+      }
+
+      if (isPasswordAction) {
+        if (hasExistingPassword.value) {
+          updates['password'] = {
+            'new': newPassword.value,
+            'current': currentPassword.value,
+          };
+        } else {
+          updates['password'] = newPassword.value;
+        }
+      }
+
+      print("🔥 FINAL UPDATES: $updates"); // DEBUG
+
+      final res = await ApiService.dioClient.put(
+        '/auth/update-profile',
+        data: updates,
+        options: dio.Options(contentType: 'application/json'),
+      );
+
+      print("🔥 RESPONSE STATUS: ${res.statusCode}");
+      print("🔥 RESPONSE DATA: ${res.data}");
+
+      if (res.statusCode == 200 && res.data['success'] == true) {
+        String message = 'Profil berhasil diperbarui';
+
+        if (isPasswordAction && !hasExistingPassword.value) {
+          message =
+              'Password berhasil dibuat! Sekarang Anda bisa login manual.';
+        }
+
+        SnackbarHelper.show(
+          'Sukses',
+          message,
+          type: 'success',
+          duration: Duration(seconds: 2),
+        );
+
+        _resetPasswordFields();
+        await fetchUserInfo();
+
+        await Future.delayed(Duration(milliseconds: 2300));
+        print("🔥 CAN POP? ${Navigator.canPop(Get.context!)}");
+        print("🔥 CURRENT ROUTE: ${Get.currentRoute}");
+
+        Get.offAllNamed(Routes.PROFILE);
+      } else {
+        SnackbarHelper.show(
+          'Gagal',
+          res.data['message'] ?? 'Gagal memperbarui profil',
+          type: 'error',
+        );
       }
     } catch (e) {
-      Get.snackbar('Error', e.toString());
+      if (e is dio.DioException) {
+        final resData = e.response?.data;
+        final msg = resData?['message'] ?? 'Terjadi kesalahan tidak diketahui';
+        print("🔥 ERROR DETAIL: $msg");
+        SnackbarHelper.show(
+          'Gagal',
+          msg,
+          type: 'error',
+        );
+      } else {
+        print("🔥 UNKNOWN ERROR: $e");
+        SnackbarHelper.show(
+          'Error',
+          'Gagal terhubung ke server',
+          type: 'error',
+        );
+      }
+    } finally {
+      isSavingChanges.value = false;
+      isCreatingPassword.value = false;
     }
+  }
+
+  // 🔥 Getter untuk label password field
+  String get passwordFieldLabel {
+    return hasExistingPassword.value ? "Ubah Password" : "Buat Password Baru";
+  }
+
+  // 🔥 Getter untuk label button
+  String get buttonLabel {
+    return hasExistingPassword.value ? "Simpan Perubahan" : "Buat Password";
+  }
+
+  // 🔥 Getter untuk icon button
+  IconData get buttonIcon {
+    return hasExistingPassword.value
+        ? Icons.save_outlined
+        : Icons.lock_outlined;
+  }
+
+  // 🔥 Getter untuk show current password field
+  bool get shouldShowCurrentPasswordField {
+    return hasExistingPassword.value && showPasswordFields.value;
   }
 
   Future<void> fetchLoginHistory() async {
@@ -92,20 +274,32 @@ class ProfileController extends GetxController {
         loginHistory.value = List<Map<String, dynamic>>.from(res.data['data']);
       }
     } catch (e) {
-      print("Gagal ambil login history: $e");
+      print("Gagal mengambil riwayat login: $e");
     }
   }
 
   Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Get.offAllNamed(Routes.LOGIN);
-    Get.snackbar('Berhasil Logout', 'Kamu telah keluar dari akun');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      Get.offAllNamed(Routes.LOGIN);
+      SnackbarHelper.show(
+        'Berhasil Logout',
+        'Anda telah keluar dari akun',
+        type: 'success',
+      );
+    } catch (e) {
+      print("Error saat logout: $e");
+    }
   }
 
   Future<void> logoutAndGoToForgotPassword() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Get.offAllNamed(Routes.FORGOT_PASSWORD);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      Get.offAllNamed(Routes.FORGOT_PASSWORD);
+    } catch (e) {
+      print("Error saat logout: $e");
+    }
   }
 }

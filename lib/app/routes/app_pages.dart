@@ -116,7 +116,6 @@ class AppPages {
     GetPage(
       name: Routes.UPDATE_PROFILE,
       page: () => UpdateProfileView(),
-      binding: BindingsBuilder(() => Get.put(ProfileController())),
       transition: Transition.rightToLeft,
     ),
 

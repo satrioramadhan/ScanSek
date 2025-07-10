@@ -24,13 +24,31 @@ class ProfileView extends StatelessWidget {
           const SizedBox(height: 20),
           _buildHeader(),
           const SizedBox(height: 16),
+
+          // 🔥 Reminder Card (jika ada)
+          Obx(() {
+            if (!controller.hasExistingPassword.value) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildReminderCard(),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+
+          const SizedBox(height: 16),
+
           _buildSectionCard(
             children: [
-              _buildMenuItem(
-                icon: Icons.person_outline,
-                title: "Ubah Profil",
-                onTap: () => Get.to(() => UpdateProfileView()),
-              ),
+              Obx(() => _buildMenuItem(
+                    icon: Icons.person_outline,
+                    title: "Ubah Profil",
+                    // 🔥 FIX: Hanya tampilkan subtitle jika user BELUM punya password
+                    subtitle: !controller.hasExistingPassword.value
+                        ? "Buat password untuk login manual"
+                        : null,
+                    onTap: () => Get.to(() => UpdateProfileView()),
+                  )),
               _buildMenuItem(
                 icon: Icons.history,
                 title: "Riwayat Login",
@@ -102,6 +120,48 @@ class ProfileView extends StatelessWidget {
     });
   }
 
+  // 🔥 Reminder Card untuk user yang belum punya password
+  Widget _buildReminderCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.security, color: Colors.orange.shade600),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Keamanan Akun",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange.shade800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  controller.reminder.value,
+                  style: TextStyle(
+                    color: Colors.orange.shade700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.arrow_forward_ios,
+              color: Colors.orange.shade600, size: 16),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionCard({required List<Widget> children}) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -123,6 +183,7 @@ class ProfileView extends StatelessWidget {
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
+    String? subtitle,
     required VoidCallback onTap,
     Color iconColor = Colors.black54,
   }) {
@@ -132,6 +193,16 @@ class ProfileView extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: iconColor),
         title: Text(title),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.orange.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              )
+            : null,
         trailing: const Icon(Icons.chevron_right, size: 20),
       ),
     );

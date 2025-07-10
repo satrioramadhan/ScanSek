@@ -82,8 +82,8 @@ class ApiService {
   }
 
   static Future<dio.Response> verifyResetOtp(String email, String otp) {
-    return dioClient
-        .post('/auth/verify-reset-otp', data: {'email': email, 'otp': otp});
+    return dioClient.post('/auth/verify-otp',
+        data: {'email': email, 'otp': otp, 'purpose': 'reset'});
   }
 
   static Future<void> logLoginActivity(Map<String, dynamic> deviceInfo) async {

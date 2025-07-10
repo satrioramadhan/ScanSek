@@ -89,7 +89,6 @@ class AuthController extends GetxController {
     } on dio.DioException catch (e) {
       print('Dio error: ${e.response?.statusCode}, data: ${e.response?.data}');
       if (e.response?.data != null && e.response?.data['otp_sent'] == true) {
-        
         final user = e.response?.data['user'];
         final refreshToken = e.response?.data['refresh_token'];
         final prefs = await SharedPreferences.getInstance();
