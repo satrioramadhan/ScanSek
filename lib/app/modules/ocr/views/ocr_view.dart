@@ -11,8 +11,8 @@ class OcrView extends GetView<OcrController> {
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
-    final width = screenSize.width * 0.6;
-    final height = width * 4 / 3;
+    final width = screenSize.width * 0.9;
+    final height = width * 1.6;
     final left = (screenSize.width - width) / 2;
     final top = (screenSize.height - height) / 2;
     final guideRect = Rect.fromLTWH(left, top, width, height);
@@ -54,7 +54,7 @@ class OcrView extends GetView<OcrController> {
                               .toSet()
                               .map((path) => Column(
                                     children: [
-                                      Image.asset(path, width: 60, height: 60),
+                                      Image.asset(path, width: 90, height: 90),
                                       Text(
                                           "x${controller.spoonImages.where((p) => p == path).length}",
                                           style: const TextStyle(

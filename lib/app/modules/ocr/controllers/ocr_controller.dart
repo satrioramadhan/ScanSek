@@ -1,5 +1,3 @@
-// ocr_controller.dart dengan mode switch yang lebih clean
-
 import 'dart:async';
 import 'dart:io';
 import 'package:scan_sek/app/utils/snackbar_helper.dart';
@@ -12,8 +10,6 @@ import 'package:image/image.dart' as img;
 enum OcrMode { capture, fotoLabel }
 
 class OcrController extends GetxController {
-  static const double TOLERANSI_BARIS_SAMA = 40.0;
-  static const double JARAK_MINIMUM_KANAN = 15.0;
   static const double GRAM_MINIMUM = 0.5;
   static const double GRAM_MAKSIMUM = 50.0;
 
@@ -27,7 +23,7 @@ class OcrController extends GetxController {
 
   var currentMode = OcrMode.capture.obs;
   var capturedImage = Rx<File?>(null);
-  var isPhotoMode = false.obs; // ✅ Tambahan untuk switch mode foto
+  var isPhotoMode = false.obs;
 
   double get sugarTeaspoon => sugarGram.value / 4.0;
 
@@ -60,45 +56,35 @@ class OcrController extends GetxController {
     super.onClose();
   }
 
-  // ✅ Method untuk toggle mode
   void togglePhotoMode() {
     isPhotoMode.value = !isPhotoMode.value;
-    resetDetection(); // Reset deteksi saat ganti mode
+    resetDetection();
   }
 
-  // ✅ Method untuk handle button utama (Deteksi/Ambil Foto Label)
   Future<void> handleMainButton() async {
-    if (isPhotoMode.value) {
-      await captureAndShowResult();
-    } else {
-      await captureImage();
-    }
+    isPhotoMode.value ? await captureAndShowResult() : await captureImage();
   }
 
-  // ✅ Method untuk get text button berdasarkan mode
-  String getMainButtonText() {
-    if (isCapturing.value) return "Memproses...";
-    return isPhotoMode.value ? "Ambil Foto Label" : "Deteksi";
-  }
+  String getMainButtonText() => isCapturing.value
+      ? "Memproses..."
+      : isPhotoMode.value
+          ? "Ambil Foto Label"
+          : "Deteksi";
 
-  // ✅ Method untuk get icon button berdasarkan mode
-  IconData getMainButtonIcon() {
-    if (isCapturing.value) return Icons.hourglass_empty;
-    return isPhotoMode.value ? Icons.image_search : Icons.search;
-  }
+  IconData getMainButtonIcon() => isCapturing.value
+      ? Icons.hourglass_empty
+      : isPhotoMode.value
+          ? Icons.image_search
+          : Icons.search;
 
   Future<void> initCamera() async {
     try {
       final cameras = await availableCameras();
-      cameraController = CameraController(
-        cameras.first,
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
+      cameraController = CameraController(cameras.first, ResolutionPreset.high,
+          enableAudio: false);
       await cameraController.initialize();
       isCameraInitialized.value = true;
     } catch (e) {
-      print("❌ Error initializing camera: $e");
       _showErrorSnackbar("Gagal membuka kamera");
     }
   }
@@ -129,16 +115,16 @@ class OcrController extends GetxController {
       final decodedImage = img.decodeImage(bytes);
 
       if (decodedImage != null) {
+        // ✅ Koreksi orientasi ukuran gambar dari landscape ke portrait
         previewSize = Size(
-          decodedImage.width.toDouble(),
-          decodedImage.height.toDouble(),
+          decodedImage.height.toDouble(), // tukar height ke width
+          decodedImage.width.toDouble(), // tukar width ke height
         );
         await _extractSugarAutomatic(result.blocks, previewSize);
         recognizedText.value = result.text;
         currentMode.value = OcrMode.fotoLabel;
       }
     } catch (e) {
-      print("❌ Error OCR fotoLabel: $e");
       _showErrorSnackbar("Gagal memproses gambar");
     } finally {
       isCapturing.value = false;
@@ -159,15 +145,13 @@ class OcrController extends GetxController {
 
       if (decodedImage != null) {
         previewSize = Size(
-          cameraController.value.previewSize!.height,
-          cameraController.value.previewSize!.width,
+          decodedImage.height.toDouble(),
+          decodedImage.width.toDouble(),
         );
         await _extractSugarAutomatic(result.blocks, previewSize);
       }
-
       recognizedText.value = result.text;
     } catch (e) {
-      print("❌ OCR Error: $e");
       _showErrorSnackbar("Gagal memproses gambar");
     } finally {
       isDetecting = false;
@@ -178,15 +162,15 @@ class OcrController extends GetxController {
       List<TextBlock> blocks, Size originalImageSize) async {
     resetDetection();
 
-    final screenSize = Get.size;
-    final transformData =
-        _calculateTransformation(originalImageSize, screenSize);
-    final allLines = _extractAllLines(blocks);
+    // PENTING: Tukar width & height karena orientasi kamera berbeda dengan layar
+    final correctedImageSize =
+        Size(originalImageSize.height, originalImageSize.width);
 
-    if (await _findSugarInSameLine(allLines, transformData)) return;
-    if (await _findSugarInNextLine(allLines, transformData)) return;
-    if (await _findSugarNearby(allLines, transformData)) return;
-    if (await _fallbackFindAnyGram(allLines, transformData)) return;
+    final transformData =
+        _calculateTransformation(correctedImageSize, Get.size);
+    final allLines = blocks.expand((block) => block.lines).toList();
+
+    if (await _findSugarStrictlyRight(allLines, transformData)) return;
     _showErrorSnackbar("Gula tidak terdeteksi");
   }
 
@@ -198,117 +182,61 @@ class OcrController extends GetxController {
 
   Map<String, double> _calculateTransformation(
       Size originalImageSize, Size screenSize) {
-    final imageAspectRatio = originalImageSize.height / originalImageSize.width;
-    final screenAspectRatio = screenSize.height / screenSize.width;
+    final originalAspect = originalImageSize.width / originalImageSize.height;
+    final screenAspect = screenSize.width / screenSize.height;
 
     double scale;
     double dx = 0;
     double dy = 0;
 
-    if (imageAspectRatio > screenAspectRatio) {
+    if (originalAspect > screenAspect) {
       scale = screenSize.width / originalImageSize.width;
-      final fittedHeight = originalImageSize.height * scale;
-      dy = (fittedHeight - screenSize.height) / 2;
+      final scaledHeight = originalImageSize.height * scale;
+      dy = (scaledHeight - screenSize.height) / 2;
     } else {
       scale = screenSize.height / originalImageSize.height;
-      final fittedWidth = originalImageSize.width * scale;
-      dx = (fittedWidth - screenSize.width) / 2;
+      final scaledWidth = originalImageSize.width * scale;
+      dx = (scaledWidth - screenSize.width) / 2;
     }
 
     return {'scale': scale, 'dx': dx, 'dy': dy};
   }
 
-  List<TextLine> _extractAllLines(List<TextBlock> blocks) {
-    final allLines = <TextLine>[];
-    for (final block in blocks) {
-      allLines.addAll(block.lines);
-    }
-    return allLines;
-  }
-
-  Future<bool> _findSugarInSameLine(
+  Future<bool> _findSugarStrictlyRight(
       List<TextLine> lines, Map<String, double> transformData) async {
-    for (final line in lines) {
-      final text = line.text.toLowerCase();
-      if (sugarRegex.hasMatch(text) && gramRegex.hasMatch(text)) {
-        final match = gramRegex.firstMatch(text);
-        if (match != null) {
-          final value =
-              double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
-          if (_isValidSugarValue(value)) {
-            await _setSugarValue(value, [line], transformData);
-            return true;
-          }
+    for (final sugarLine in lines
+        .where((line) => sugarRegex.hasMatch(line.text.toLowerCase()))) {
+      final sugarCenter = sugarLine.boundingBox.center;
+
+      TextLine? closestGramLine;
+      double closestDistance = double.infinity;
+
+      for (final line in lines) {
+        if (line == sugarLine) continue;
+        final gramMatch = gramRegex.firstMatch(line.text.toLowerCase());
+        if (gramMatch == null) continue;
+
+        final gramCenter = line.boundingBox.center;
+
+        // Pastikan gram ada di kanan gula
+        if (gramCenter.dx <= sugarCenter.dx) continue;
+
+        // Hitung jarak diagonal (Euclidean)
+        final distance = (gramCenter - sugarCenter).distance;
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestGramLine = line;
         }
       }
-    }
-    return false;
-  }
 
-  Future<bool> _findSugarInNextLine(
-      List<TextLine> lines, Map<String, double> transformData) async {
-    for (int i = 0; i < lines.length - 1; i++) {
-      final current = lines[i];
-      final next = lines[i + 1];
-
-      if (sugarRegex.hasMatch(current.text.toLowerCase())) {
-        final match = gramRegex.firstMatch(next.text.toLowerCase());
-        if (match != null) {
-          final value =
-              double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
-          if (_isValidSugarValue(value)) {
-            await _setSugarValue(value, [current, next], transformData);
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  Future<bool> _findSugarNearby(
-      List<TextLine> lines, Map<String, double> transformData) async {
-    for (final sugarLine in lines) {
-      if (sugarRegex.hasMatch(sugarLine.text.toLowerCase())) {
-        final sugarX = sugarLine.boundingBox.center.dx;
-        final sugarY = sugarLine.boundingBox.center.dy;
-
-        for (final gramLine in lines) {
-          if (gramLine == sugarLine) continue;
-
-          final match = gramRegex.firstMatch(gramLine.text.toLowerCase());
-          if (match != null) {
-            final gramX = gramLine.boundingBox.center.dx;
-            final gramY = gramLine.boundingBox.center.dy;
-
-            final yDiff = (sugarY - gramY).abs();
-            final xDiff = gramX - sugarX;
-
-            if (yDiff < TOLERANSI_BARIS_SAMA && xDiff > JARAK_MINIMUM_KANAN) {
-              final value =
-                  double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
-              if (_isValidSugarValue(value)) {
-                await _setSugarValue(
-                    value, [sugarLine, gramLine], transformData);
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  Future<bool> _fallbackFindAnyGram(
-      List<TextLine> lines, Map<String, double> transformData) async {
-    for (final line in lines) {
-      final match = gramRegex.firstMatch(line.text.toLowerCase());
-      if (match != null) {
+      if (closestGramLine != null) {
+        final match = gramRegex.firstMatch(closestGramLine.text.toLowerCase());
         final value =
-            double.tryParse(match.group(1)!.replaceAll(',', '.')) ?? 0;
-        if (_isValidSugarValue(value)) {
-          await _setSugarValue(value, [line], transformData);
+            double.tryParse(match?.group(1)?.replaceAll(',', '.') ?? '');
+        if (value != null && value >= GRAM_MINIMUM && value <= GRAM_MAKSIMUM) {
+          await _setSugarValue(
+              value, [sugarLine, closestGramLine], transformData);
           return true;
         }
       }
@@ -316,35 +244,30 @@ class OcrController extends GetxController {
     return false;
   }
 
-  bool _isValidSugarValue(double value) {
-    return value >= GRAM_MINIMUM && value <= GRAM_MAKSIMUM;
+  Rect _transformRect(Rect rect, double scale, double dx, double dy) {
+    return Rect.fromLTWH(
+      rect.left * scale - dx,
+      rect.top * scale - dy,
+      rect.width * scale,
+      rect.height * scale,
+    );
   }
 
   Future<void> _setSugarValue(double value, List<TextLine> lines,
       Map<String, double> transformData) async {
     sugarGram.value = value;
-
-    for (final line in lines) {
-      highlightRects.add(_transformRect(line.boundingBox,
-          transformData['scale']!, transformData['dx']!, transformData['dy']!));
-    }
+    highlightRects.assignAll(lines.map((line) => _transformRect(
+        line.boundingBox,
+        transformData['scale']!,
+        transformData['dx']!,
+        transformData['dy']!)));
 
     _generateSpoons(value);
 
     SnackbarHelper.show(
       "Gula Terdeteksi",
-      "${value.toStringAsFixed(1)}g = ${(value / 4).toStringAsFixed(1)} sdt",
+      "${value}g = ${(value / 4).toStringAsFixed(1)} sdt",
       type: "success",
-    );
-  }
-
-  Rect _transformRect(Rect rect, double scale, double dx, double dy) {
-    const offsetY = 5.0;
-    return Rect.fromLTWH(
-      rect.left * scale - dx,
-      rect.top * scale - dy - offsetY,
-      rect.width * scale,
-      rect.height * scale,
     );
   }
 
